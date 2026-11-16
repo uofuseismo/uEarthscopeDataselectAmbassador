@@ -1,5 +1,7 @@
 #ifndef UEARTHSCOPE_DATASELECT_AMBASSADOR_EARTHSCOPE_CLIENT_OPTIONS_HPP
 #define UEARTHSCOPE_DATASELECT_AMBASSADOR_EARTHSCOPE_CLIENT_OPTIONS_HPP
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -45,6 +47,21 @@ public:
     /// @result The earthscope endpoint.  
     /// @note By default this is https://service.earthscope.org/fdsnws/dataselect/1
     [[nodiscard]] std::string getEndpoint() const;
+
+    /// @brief Set the maximum response payload in bytes.
+    /// @param[in] maximumPayloadInBytes  The maximum response payload in bytes.
+    /// @throws std::invalid_argument if this is not positive.
+    void setMaximumResponseSizeInBytes(int64_t maximumPayloadInBytes);
+    /// @result The maximum response payload.  By default this is 32 Mb which
+    ///         is appropriate for the small requests in operations settings.
+    [[nodiscard]] int64_t getMaximumResponseSizeInBytes() const noexcept;
+
+    /// @brief Sets the request timeout.
+    /// @throws std::invalid_argument if the timeout is not positive.
+    void setRequestTimeOut(const std::chrono::milliseconds &timeOut);
+    /// @result The cURL timeout.  
+    /// @note By default this is 15 seconds.
+    [[nodiscard]] std::chrono::milliseconds getRequestTimeOut() const noexcept;
 
     /// @brief Creates the earthscope client options from an
     ///        initialization file.

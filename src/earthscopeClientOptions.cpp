@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -12,6 +14,12 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
 #include "secretFile.hpp"
+
+namespace
+{
+constexpr int MAXIMUM_PAYLOAD_MB{32};
+constexpr int REQUEST_TIMEOUT_S{15};
+}
 
 using namespace UEarthscopeDataselectAmbassador;
 
@@ -51,6 +59,14 @@ public:
     std::pair<std::string, std::string> mUserNameAndPassword;
     std::string mAccessToken;
     std::string mEndpoint{"https://service.earthscope.org/fdsnws/dataselect/1"};
+    int64_t mMaximumPayloadInBytes
+    {
+        MAXIMUM_PAYLOAD_MB*1024L*1024L
+    };
+    std::chrono::milliseconds mRequestTimeOut
+    {
+        std::chrono::seconds {REQUEST_TIMEOUT_S}
+    };
     bool mHasUserNameAndPassword{false}; 
 };
 
@@ -147,6 +163,40 @@ bool EarthscopeClientOptions::hasLegacyCredentials() const noexcept
     return pImpl->mHasUserNameAndPassword;
 }
 
+/// Payload
+void EarthscopeClientOptions::setMaximumResponseSizeInBytes(
+    const int64_t maximumResponseInBytes)
+{
+    if (maximumResponseInBytes < 1)
+    {
+        throw std::invalid_argument("Maximum response size must be positive");
+    }
+    pImpl->mMaximumPayloadInBytes = maximumResponseInBytes;
+}
+
+int64_t EarthscopeClientOptions::getMaximumResponseSizeInBytes()
+    const noexcept
+{
+    return pImpl->mMaximumPayloadInBytes;
+}
+
+/// Time out
+void EarthscopeClientOptions::setRequestTimeOut(
+    const std::chrono::milliseconds &timeOut)
+{
+    if (timeOut <= std::chrono::milliseconds {0})
+    {
+        throw std::invalid_argument("Time out must be positive");
+    }
+    pImpl->mRequestTimeOut = timeOut;
+}
+
+std::chrono::milliseconds 
+EarthscopeClientOptions::getRequestTimeOut() const noexcept
+{
+    return pImpl->mRequestTimeOut;
+}
+
 /// Endpoint
 void EarthscopeClientOptions::setEndpoint(const std::string &endpointIn)
 {
@@ -215,6 +265,21 @@ EarthscopeClientOptions::fromInitializationFile(
     {
         throw std::invalid_argument("Access token or basic creds required");
     }
+
+    // Timeout
+    auto requestTimeOut
+        = propertyTree.get<int> 
+          (section + "requestTimeOutInSeconds",
+           REQUEST_TIMEOUT_S);
+    options.setRequestTimeOut(std::chrono::seconds {requestTimeOut}); 
+
+    // Maximum paylaod
+    int64_t maximumPayload
+        = propertyTree.get<int>
+          (section + "maximumResponseSizeInMegabytes",
+           MAXIMUM_PAYLOAD_MB);
+    maximumPayload = maximumPayload*(1024L*1024L);
+    options.setMaximumResponseSizeInBytes(maximumPayload);
     return options;
 }   
 

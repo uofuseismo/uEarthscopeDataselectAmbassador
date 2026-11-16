@@ -12,6 +12,7 @@
 #include <crow/http_request.h>
 #include <crow/http_response.h>
 #include <crow/logging.h>
+#include "uEarthscopeDataselectAmbassador/curlGlobal.hpp"
 #include "uEarthscopeDataselectAmbassador/earthscopeClient.hpp"
 //NOLINTNEXTLINE(misc-include-cleaner)
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
@@ -97,6 +98,7 @@ public:
 int main(int argc, char *argv[])
 {
     using namespace UEarthscopeDataselectAmbassador;
+    const CURLGlobal curlGlobal;
     Metrics::initializeMetricsSingleton();
     //NOLINTNEXTLINE(misc-include-cleaner)
     auto consoleLogger = spdlog::stdout_color_st("console");
@@ -150,7 +152,9 @@ int main(int argc, char *argv[])
 
     // Create the star of the show
     EarthscopeClient
-        earthscopeClient{programOptions.earthscopeClientOptions, logger};
+        earthscopeClient{programOptions.earthscopeClientOptions,
+                         curlGlobal,
+                         logger};
 
     return EXIT_SUCCESS;
 }
