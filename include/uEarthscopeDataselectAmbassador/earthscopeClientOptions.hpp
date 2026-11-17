@@ -59,9 +59,16 @@ public:
     /// @brief Sets the request timeout.
     /// @throws std::invalid_argument if the timeout is not positive.
     void setRequestTimeOut(const std::chrono::milliseconds &timeOut);
-    /// @result The cURL timeout.  
+    /// @result The cURL request timeout.  
     /// @note By default this is 15 seconds.
     [[nodiscard]] std::chrono::milliseconds getRequestTimeOut() const noexcept;
+
+    /// @brief Sets the connect timeout.
+    /// @throws std::invalid_argument if the timeout is not positive.
+    void setConnectTimeOut(const std::chrono::milliseconds &timeOut);
+    /// @result The cURL connection timeout.  
+    /// @note By default this is 5 seconds.
+    [[nodiscard]] std::chrono::milliseconds getConnectTimeOut() const noexcept;
 
     /// @brief Creates the earthscope client options from an
     ///        initialization file.

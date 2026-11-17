@@ -1,5 +1,3 @@
-#include <algorithm>
-#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -19,35 +17,27 @@ namespace
 {
 constexpr int MAXIMUM_PAYLOAD_MB{32};
 constexpr int REQUEST_TIMEOUT_S{15};
+constexpr int CONNECT_TIMEOUT_S{5};
 }
 
 using namespace UEarthscopeDataselectAmbassador;
 
 namespace
 {
-[[nodiscard]] 
-std::string transform(const std::string &nameIn)
+
+[[nodiscard]]
+std::string sanitizeUserName(const std::string &nameIn)
 {
-    const auto isSpace = [](const unsigned char c)
-                         {
-                             return std::isspace(c) != 0;
-                         };
-    auto first = std::ranges::find_if_not(nameIn, isSpace);
-    auto last = std::ranges::find_if_not(nameIn.rbegin(), nameIn.rend(),
-                                         isSpace).base();
-    if (first >= last){return {};} 
-    std::string name{first, last};
-    for (auto &c : name)
-    {    
-        const auto lowered
-            = static_cast<char> (std::tolower(static_cast<unsigned char> (c)));
-        const auto isAllowed = (lowered >= 'a' && lowered <= 'z') 
-                            || (lowered >= '0' && lowered <= '9') 
-                            || lowered == '.' || lowered == '_'
-                            || lowered == '-' || lowered == '@'; 
-        if (!isAllowed){return {};} 
-        c = lowered;
-    }    
+    std::string name;
+    name.reserve(nameIn.size());
+    for (const auto c : nameIn)
+    {
+        if (c == '\r' || c == '\n' || c == ':' || c == ' ' || c == '\t')
+        {
+            continue;
+        }
+        name.push_back(c);
+    }
     return name;
 }
 }
@@ -66,6 +56,10 @@ public:
     std::chrono::milliseconds mRequestTimeOut
     {
         std::chrono::seconds {REQUEST_TIMEOUT_S}
+    };
+    std::chrono::milliseconds mConnectTimeOut
+    {
+        std::chrono::seconds {CONNECT_TIMEOUT_S}
     };
     bool mHasUserNameAndPassword{false}; 
 };
@@ -136,7 +130,7 @@ bool EarthscopeClientOptions::hasAccessToken() const noexcept
 void EarthscopeClientOptions::setLegacyCredentials(
     const std::pair<std::string, std::string> &userNameAndPassword)
 {
-    auto user = ::transform(userNameAndPassword.first);
+    auto user = ::sanitizeUserName(userNameAndPassword.first);
     if (user.empty()){throw std::invalid_argument("User name is empty");}
     auto password = userNameAndPassword.second;
     if (password.empty())
@@ -180,7 +174,7 @@ int64_t EarthscopeClientOptions::getMaximumResponseSizeInBytes()
     return pImpl->mMaximumPayloadInBytes;
 }
 
-/// Time out
+/// Request time out
 void EarthscopeClientOptions::setRequestTimeOut(
     const std::chrono::milliseconds &timeOut)
 {
@@ -195,6 +189,23 @@ std::chrono::milliseconds
 EarthscopeClientOptions::getRequestTimeOut() const noexcept
 {
     return pImpl->mRequestTimeOut;
+}
+
+/// Connect time out
+void EarthscopeClientOptions::setConnectTimeOut(
+    const std::chrono::milliseconds &timeOut)
+{
+    if (timeOut <= std::chrono::milliseconds {0})
+    {   
+        throw std::invalid_argument("Connect time out must be positive");
+    }
+    pImpl->mConnectTimeOut = timeOut;
+}
+
+std::chrono::milliseconds 
+EarthscopeClientOptions::getConnectTimeOut() const noexcept
+{
+    return pImpl->mConnectTimeOut;
 }
 
 /// Endpoint
@@ -266,14 +277,20 @@ EarthscopeClientOptions::fromInitializationFile(
         throw std::invalid_argument("Access token or basic creds required");
     }
 
-    // Timeout
+    // Timeouts
     auto requestTimeOut
         = propertyTree.get<int> 
           (section + "requestTimeOutInSeconds",
            REQUEST_TIMEOUT_S);
     options.setRequestTimeOut(std::chrono::seconds {requestTimeOut}); 
 
-    // Maximum paylaod
+    auto connectTimeOut
+        = propertyTree.get<int> 
+          (section + "connectTimeOutInSeconds",
+           CONNECT_TIMEOUT_S);
+    options.setConnectTimeOut(std::chrono::seconds {connectTimeOut});
+
+    // Maximum payload
     int64_t maximumPayload
         = propertyTree.get<int>
           (section + "maximumResponseSizeInMegabytes",

@@ -28,7 +28,7 @@ else()
 endif()
 
 find_package(spdlog REQUIRED)
-find_package(Boost REQUIRED headers program_options REQUIRED)
+find_package(Boost REQUIRED headers program_options url REQUIRED)
 find_package(Threads REQUIRED)
 #find_package(libmseed REQUIRED)
 find_package(Crow REQUIRED)
@@ -96,13 +96,15 @@ set(HEADER_FILES
     include/${PROJECT_NAME}/curlGlobal.hpp
     include/${PROJECT_NAME}/earthscopeClient.hpp
     include/${PROJECT_NAME}/earthscopeClientOptions.hpp
-    include/${PROJECT_NAME}/metricsSingleton.hpp)
+    include/${PROJECT_NAME}/metricsSingleton.hpp
+    include/${PROJECT_NAME}/request.hpp)
 
 set(LIBRARY_SRC
     src/curlGlobal.cpp
     src/earthscopeClient.cpp
     src/earthscopeClientOptions.cpp
     src/metricsSingleton.cpp
+    src/request.cpp
     src/version.cpp)
 
 if (${BUILD_SHARED_LIBS})
@@ -126,6 +128,7 @@ target_link_libraries(libuEarthscopeDataselectAmbassador
                       PUBLIC spdlog::spdlog_header_only
                       PRIVATE Boost::headers
                               Boost::program_options
+                              Boost::url
                               Threads::Threads
                               CURL::libcurl)
 target_sources(libuEarthscopeDataselectAmbassador
@@ -176,5 +179,98 @@ else()
                                  opentelemetry-cpp::otlp_http_metric_exporter)
 endif()
 
+##########################################################################################
+#                                      Testing                                           #
+##########################################################################################
+if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
+   include(Catch)
+   set(TEST_SRC
+       testing/earthscopeClientOptions.cpp
+       testing/request.cpp)
+   add_executable(unitTests ${TEST_SRC})
+   set_target_properties(unitTests PROPERTIES
+                         CXX_STANDARD 23
+                         CXX_STANDARD_REQUIRED YES
+                         CXX_EXTENSIONS NO)
+   # src/ is on the path so tests can reach private headers (e.g., curl.hpp)
+   target_include_directories(unitTests
+                              PRIVATE ${CMAKE_SOURCE_DIR}/include
+                                      ${CMAKE_SOURCE_DIR}/src
+                                      ${CMAKE_CURRENT_BINARY_DIR}/include)
+   target_link_libraries(unitTests
+                         PRIVATE uEarthscopeDataselectAmbassador::libuEarthscopeDataselectAmbassador
+                                 Catch2::Catch2WithMain)
+   catch_discover_tests(unitTests)
+endif()
 
+##########################################################################################
+#                                      Installation                                      #
+##########################################################################################
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    cmake/${PROJECT_NAME}Config.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+    VERSION "${version}"
+    COMPATIBILITY AnyNewerVersion
+)
+
+install(TARGETS libuEarthscopeDataselectAmbassador
+        EXPORT ${PROJECT_NAME}Targets
+        FILE_SET HEADERS
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        COMPONENT libraries)
+install(TARGETS uEarthscopeDataselectAmbassador
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT applications)
+install(EXPORT ${PROJECT_NAME}Targets
+        NAMESPACE ${PROJECT_NAME}::
+        FILE ${PROJECT_NAME}Targets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
+##########################################################################################
+#                                     CPack Packaging                                    #
+##########################################################################################
+# The tarball is what the container is built from: Dockerfile.u26 expects
+# ${PROJECT_NAME}-${PROJECT_VERSION}-Linux.tar.gz, which is CPack's default
+# name for a TGZ on Linux.
+set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
+set(CPACK_PACKAGE_VENDOR "UUSS")
+set(CPACK_PACKAGE_CONTACT "ben.baker@utah.edu")
+set(CPACK_PACKAGE_LICENSE "MIT")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "An ambassador for local tools at UUSS to so as to get data from Earthscope's FDSNWS.")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY ${CPACK_PACKAGE_NAME})
+set(CPACK_VERBATIM_VARIABLES YES)
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+set(CPACK_GENERATOR TGZ)
+include(CPack)
+
+##########################################################################################
+#                                        Containers                                      #
+##########################################################################################
+if (${BUILD_CONTAINER})
+   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/Dockerfile.u26.in
+                  ${CMAKE_CURRENT_BINARY_DIR}/Dockerfile.u26 @ONLY)
+   find_program(buildah_EXECUTABLE buildah)
+   if (buildah_EXECUTABLE)
+      # Local convenience: cmake --build . --target buildah
+      add_custom_target(buildah
+                        COMMENT "Preparing the container with buildah"
+                        COMMAND ${CMAKE_CPACK_COMMAND} -G TGZ 
+                        COMMAND ${buildah_EXECUTABLE} bud -t uearthscopedataselectambassador:${PROJECT_VERSION} -t uearthscopedataselectambassador:latest -f ./Dockerfile.u26
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} VERBATIM)
+      add_dependencies(buildah uEarthscopeDataselectAmbassador)
+   endif()
+endif()
 

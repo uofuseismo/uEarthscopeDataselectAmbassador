@@ -1,11 +1,13 @@
 #ifndef UEARTHSCOPE_DATASELECT_AMBASSADOR_EARTHSCOPE_CLIENT_HPP
 #define UEARTHSCOPE_DATASELECT_AMBASSADOR_EARTHSCOPE_CLIENT_HPP
+#include <expected>
 #include <memory> 
 #include <spdlog/logger.h>
 namespace UEarthscopeDataselectAmbassador
 {
  class CURLGlobal;
  class EarthscopeClientOptions;
+ class Request;
 }
 namespace UEarthscopeDataselectAmbassador
 {   
@@ -14,7 +16,26 @@ namespace UEarthscopeDataselectAmbassador
 /// @copyright Ben Baker (University of Utah) distributed under the
 ///            MIT NO AI license.
 class EarthscopeClient
-{   
+{
+public:
+    struct Response
+    {
+        std::string payload;     /*!< The response. */
+        std::string contentType; /*!< Content type code. */ 
+        int status;              /*!< The HTTP status code. */
+    };
+ 
+    enum class Error
+    {
+        EmptyURL,          /*!< The URL is empty. */
+        InvalidRequest,    /*!< Requisite information in the request was missing
+                                such as the start and end time. */
+        ConnectionFailure, /*!< Earthscope connection failure - try again later. */
+        TimedOut,          /*!< Request timed out. */
+        TooLarge,          /*!< The resulting payload was too large, retrying
+                                won't help here. */
+        ServerError        /*!< An internal server error. */ 
+    };
 public:
     /// @brief Constructor.
     /// @param[in] options     The earthscope client options.
@@ -29,6 +50,9 @@ public:
 
     /// @brief True indicates that the class is initialized.
     [[nodiscard]] bool isInitialized() const noexcept;
+
+    /// @brief Performs a GET request to the Earthscope FDSNWS.
+    [[nodiscard]] auto get(const Request &request) const -> std::expected<Response, Error>;
 
     /// @brief Destructor
     ~EarthscopeClient();

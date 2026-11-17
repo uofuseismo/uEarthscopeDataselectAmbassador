@@ -1,0 +1,21 @@
+#.rst
+# FinduEarthscopeDataselectAmbassador
+# -----------------------------------
+#
+# Finds the UUSS Earthscope ambassador library.
+#
+# Imported Targets
+# ^^^^^^^^^^^^^^^^
+#
+# ``uEarthscopeDataselectAmbassador_FOUND``
+#   True indicates uEarthscopeDataselectAmbassador was found.
+# ``uEarthscopeDataselectAmbassador::uEarthscopeDataselectAmbassador``
+#   The Earthscope dataselect ambassador library, if found.
+include(CMakeFindDependencyMacro)
+
+#find_dependency(gRPC CONFIG)
+find_dependency(spdlog)
+
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")

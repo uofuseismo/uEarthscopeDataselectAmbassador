@@ -156,5 +156,79 @@ int main(int argc, char *argv[])
                          curlGlobal,
                          logger};
 
+    // 
+    crow::logger::setHandler(&customLogger);
+    crow::SimpleApp app;
+    CROW_ROUTE(app, "/")
+    ([&]() -> crow::response
+    {   
+        SPDLOG_LOGGER_DEBUG(customLogger.logger, "Default route");
+        return crow::response(200);
+    });
+    CROW_ROUTE(app, "/fdsnws/dataselect/1/query")
+    ([&](const crow::request &request) -> crow::response
+    {
+        SPDLOG_LOGGER_DEBUG(customLogger.logger, "Default route");
+/*
+        const auto mark = request.raw_url.find('?');
+        const Request request{mark == std::string::npos ? std::string {} : request.raw_url.substr(mark + 1)};
+*/
+        return crow::response(200);
+    });
+
+    /// Run app
+    try
+    {
+        SPDLOG_LOGGER_INFO(customLogger.logger,
+                           "Starting Crow on {}:{}",
+                           programOptions.crowOptions.bindAddress,
+                           programOptions.crowOptions.port);
+        app.bindaddr(programOptions.crowOptions.bindAddress)
+           .port(programOptions.crowOptions.port)
+           .server_name(programOptions.crowOptions.serverName);
+        app.concurrency(programOptions.crowOptions.nThreads);
+        if (programOptions.crowOptions.nThreads > 1)
+        {
+           SPDLOG_LOGGER_INFO(consoleLogger, "Enabling concurrency");
+           app.multithreaded();
+        }
+#ifdef CROW_ENABLE_COMPRESSION
+        if (programOptions.crowOptions.useCompression)
+        {
+            SPDLOG_LOGGER_INFO(consoleLogger, "Enabling compression");
+            app.use_compression(programOptions.crowOptions.compression);
+        }
+#endif
+#ifdef CROW_ENABLE_SSL
+        if (programOptions.crowOptions.useSSL)
+        {
+            if (programOptions.crowOptions.useCertificateChain)
+            {
+                SPDLOG_LOGGER_INFO(consoleLogger, "Enabling SSL key chain");
+                app.ssl_chainfile(
+                   programOptions.crowOptions.certificateAndKeyFile.first,
+                   programOptions.crowOptions.certificateAndKeyFile.second);
+            }
+            else
+            {
+                SPDLOG_LOGGER_INFO(consoleLogger, "Enabling SSL keys");
+                app.ssl_file(
+                   programOptions.crowOptions.certificateAndKeyFile.first,
+                   programOptions.crowOptions.certificateAndKeyFile.second);
+            }
+        }
+#endif
+        app.run();
+        SPDLOG_LOGGER_INFO(consoleLogger, "Finished running Crow");
+        //UEarthscopeDataselectAmbassador::Metrics::cleanup();
+        UEarthscopeDataselectAmbassador::Logger::cleanup();
+        return EXIT_SUCCESS;
+    }
+    catch (const std::exception &e)
+    {
+        //UEarthscopeDataselectAmbassador::Metrics::cleanup();
+        UEarthscopeDataselectAmbassador::Logger::cleanup();
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
