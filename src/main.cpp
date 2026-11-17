@@ -1,14 +1,18 @@
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <stdlib.h> // setenv
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h> //NOLINT
 #include <crow/app.h>
+#include <crow/common.h>
 #include <crow/http_request.h>
 #include <crow/http_response.h>
 #include <crow/logging.h>
@@ -17,10 +21,125 @@
 //NOLINTNEXTLINE(misc-include-cleaner)
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
 #include "uEarthscopeDataselectAmbassador/metricsSingleton.hpp"
+#include "uEarthscopeDataselectAmbassador/request.hpp"
 #include "uEarthscopeDataselectAmbassador/version.hpp"
 #include "parseCommandLineOptions.hpp"
 #include "programOptions.hpp"
 #include "logger.hpp"
+#include "crowHelper.hpp"
+
+/*
+namespace
+{
+[[nodiscard]] crow::response toErrorResponse(const int status,
+                                             const std::string &reason,
+                                             const std::string &details)
+{
+    crow::response response{status,
+        std::format("Error {}: {}\n\n{}\n", status, reason, details)};
+    response.set_header("Content-Type", "text/plain");
+    return response;
+}
+
+[[nodiscard]] crow::response toCrowResponse(
+    std::expected<UEarthscopeDataselectAmbassador::EarthscopeClient::Response,
+                  UEarthscopeDataselectAmbassador::EarthscopeClient::Error> &&result,
+    spdlog::logger &logger)
+{
+    using Error = UEarthscopeDataselectAmbassador::EarthscopeClient::Error;
+    if (!result.has_value())
+    {
+        if (result.error() == Error::TimedOut)
+        {
+            return ::toErrorResponse(504,
+                                     "Gateway Timeout",
+                                     "EarthScope did not respond in time");
+        }
+        else if (result.error() == Error::ConnectionFailure)
+        {
+            return ::toErrorResponse(502,
+                                     "Bad Gateway",
+                                     "Could not reach EarthScope");
+        }
+        else if (result.error() == Error::TooLarge)
+        {
+            return ::toErrorResponse(413,
+                                     "Payload Too Large",
+                                     "Request a shorter time window");
+        }
+        else if (result.error() == Error::InvalidRequest)
+        {
+            return ::toErrorResponse(400,
+                                     "Bad Request",
+                                     "Invalid request");
+        }
+        // This should never happen - shouldn't give same request either
+        // is 500 right?
+        else if (result.error() == Error::EmptyURL) 
+        {
+            return ::toErrorResponse(500,
+                                     "Internal Server Error",
+                                     "Internal error");
+        }
+        return ::toErrorResponse(500,
+                                 "Internal Server Error",
+                                 "Internal error");
+    }
+
+    auto &upstream = *result;
+    if (upstream.status == 200)
+    {
+        crow::response response{200, std::move(upstream.payload)};
+        response.set_header("Content-Type",
+                            upstream.contentType.empty() ?
+                            "application/vnd.fdsn.mseed" : upstream.contentType);
+        return response;
+    }
+    else if (upstream.status == 204)
+    {
+        return crow::response{204};
+    }
+    else if (upstream.status == 400 ||
+             upstream.status == 404 ||
+             upstream.status == 413)
+    {
+        return ::toErrorResponse(upstream.status,
+                                 upstream.status == 404 ? "Not Found" :
+                                 upstream.status == 413 ? "Payload Too Large" : "Bad Request",
+                                 upstream.payload);
+    }
+    else if (upstream.status == 401 || upstream.status == 403)
+    {
+        SPDLOG_LOGGER_CRITICAL(&logger,
+                               "EarthScope rejected our credentials ({})",
+                               upstream.status);
+        return ::toErrorResponse(502,
+                                 "Bad Gateway",
+                                 "Upstream authentication failed");
+    }
+    else if (upstream.status == 429)
+    {
+        SPDLOG_LOGGER_CRITICAL(&logger, "EarthScope quota exceeded");
+        return ::toErrorResponse(503,
+                                 "Service unavailable",
+                                 "Upstream quota exceeded");
+    }
+    SPDLOG_LOGGER_WARN(&logger,
+                       "Unexpected EarthScope status {}",
+                        upstream.status);
+    if (upstream.status >= 500)
+    {
+        return ::toErrorResponse(503,
+                                 "Service Unavailable",
+                                 "EarthScope is unavailable");
+    }
+    return ::toErrorResponse(502,
+                             "Bad Gateway",
+                             "Unexpected response from EarthScope");
+}
+
+}
+*/
 
 class CustomLogger : public crow::ILogHandler
 {
@@ -166,17 +285,45 @@ int main(int argc, char *argv[])
         return crow::response(200);
     });
     CROW_ROUTE(app, "/fdsnws/dataselect/1/query")
-    ([&](const crow::request &request) -> crow::response
+        .methods(crow::HTTPMethod::Get)
+    ([&](const crow::request &httpRequest) -> crow::response
     {
-        SPDLOG_LOGGER_DEBUG(customLogger.logger, "Default route");
-/*
-        const auto mark = request.raw_url.find('?');
-        const Request request{mark == std::string::npos ? std::string {} : request.raw_url.substr(mark + 1)};
-*/
-        return crow::response(200);
+        const auto mark = httpRequest.raw_url.find('?');
+        const std::string query
+        {
+            mark == std::string::npos ?
+                    std::string {} : httpRequest.raw_url.substr(mark + 1)
+        };
+        std::optional<Request> request;
+        try
+        {
+            request.emplace(query);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            SPDLOG_LOGGER_DEBUG(logger, "Rejected query: {}", e.what());
+            return toErrorResponse(400, "Bad Request", e.what());
+        }
+        catch (const std::exception &e)
+        {
+            SPDLOG_LOGGER_ERROR(logger, "Failed to parse query: {}", e.what());
+            return toErrorResponse(500, "Internal Server Error", "Internal error");
+        }
+        const auto startClock = std::chrono::steady_clock::now();
+        auto response = toCrowResponse(earthscopeClient.get(*request), *logger);
+        SPDLOG_LOGGER_INFO(
+            logger,
+            "{}.{}.{}.{} -> {} ({} bytes, {} ms)",
+            request->getNetwork().value_or("*"),
+            request->getStation().value_or("*"),
+            request->getLocationCode().value_or("*"),
+            request->getChannel().value_or("*"),
+            response.code, response.body.size(),
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now() - startClock).count());
+        return response;
     });
 
-    /// Run app
     try
     {
         SPDLOG_LOGGER_INFO(customLogger.logger,
