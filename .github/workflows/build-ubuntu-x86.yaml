@@ -1,0 +1,151 @@
+name: uEarthscopeDataselectAmbassador
+run-name: Pipeline for branch ${{ github.ref_name }}
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Nightly rebuild so the image picks up base-image security updates.
+  # Off the hour because scheduled runs queue heavily at :00 (UTC).
+  # GitHub disables schedules after 60 days without repository activity.
+  schedule:
+    - cron: '23 9 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PROJECT_NAME: uEarthscopeDataselectAmbassador
+  CONTAINER_NAME: uearthscopedataselectambassador
+  QUAY_DIRECTORY: uearthscopedataselectambassador
+  BUILD_TYPE: Release
+  CXX: /usr/bin/clang++
+  CC: /usr/bin/clang
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    name: Build
+    steps:
+      - uses: actions/checkout@v6
+
+      # setup-python's pip cache insists on a requirements.txt
+      - run: touch requirements.txt
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: 'pip'
+      - run: pip install conan
+
+      - name: Prepare build environment
+        uses: ./.github/actions/prepare-environment
+
+      - name: Conan cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.conan2/p
+          key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.py') }}
+
+      - name: Create Conan profile
+        run: |
+          conan profile detect -f
+          printf '\n[conf]\ntools.cmake.cmaketoolchain:generator=Ninja\n' >> ~/.conan2/profiles/default
+          cat ~/.conan2/profiles/default
+
+      - name: Install Conan dependencies
+        run: >
+          conan install . --build=missing
+          -s:a build_type=${{ env.BUILD_TYPE }}
+          -s:a compiler.cppstd=23
+          -s:a compiler.libcxx=libstdc++11
+          --output-folder .
+
+      - name: Configure and build
+        run: |
+          cmake --preset conan-release \
+                -DWITH_CONAN=ON \
+                -DENABLE_SSL=ON \
+                -DENABLE_COMPRESSION=ON \
+                -DBUILD_CONTAINER=ON \
+                -DCMAKE_CXX_FLAGS="-Wall -Wextra"
+          cmake --build --preset conan-release
+          # The test and package jobs need the presets to find build/Release
+          cp CMakeUserPresets.json build/
+
+      - name: Upload build directory
+        uses: ./.github/actions/upload-build-directory
+
+  test:
+    needs: build
+    runs-on: ubuntu-26.04
+    name: Test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare test environment
+        uses: ./.github/actions/prepare-environment
+
+      - name: Download build directory
+        uses: ./.github/actions/download-build-directory
+
+      - name: Run unit tests
+        run: |
+          mv build/CMakeUserPresets.json ./
+          ctest --preset conan-release --output-on-failure
+
+  package:
+    needs: test
+    # Never push an image from a pull request
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-26.04
+    name: Package
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare package environment
+        uses: ./.github/actions/prepare-environment
+
+      - name: Download build directory
+        uses: ./.github/actions/download-build-directory
+
+      - name: Package tgz
+        run: |
+          mv build/CMakeUserPresets.json ./
+          cd build/Release
+          cpack -G TGZ -B artifacts
+
+      - name: Build and push image
+        env:
+          QUAY_ROBOT_PASSWORD: ${{ secrets.QUAY_ROBOT_PASSWORD }}
+          QUAY_ROBOT_USER: ${{ secrets.QUAY_ROBOT_USER }}
+        run: |
+          set -euo pipefail
+          echo "${QUAY_ROBOT_PASSWORD}" | buildah login -u "${QUAY_ROBOT_USER}" --password-stdin quay.io
+          cd build/Release
+          cp artifacts/*.tar.gz ./
+          version=$(ls ${PROJECT_NAME}-*-Linux.tar.gz | sed "s/${PROJECT_NAME}-//; s/-Linux.tar.gz//")
+          echo "Will build container version ${version}"
+          buildah bud -t ${CONTAINER_NAME}:${version} -t ${CONTAINER_NAME}:latest -f ./Dockerfile.u26
+          # The plain version tag is what the Deployment references; the
+          # dated tag traces a pod's digest to a build and keeps yesterday's
+          # image reachable if a base-image update breaks something.
+          dated="${version}-$(date -u +%Y%m%d)"
+          buildah tag ${CONTAINER_NAME}:${version} quay.io/uuss/${QUAY_DIRECTORY}:${version}
+          buildah tag ${CONTAINER_NAME}:${version} quay.io/uuss/${QUAY_DIRECTORY}:${dated}
+          # Retry transient registry failures, but fail the step if every
+          # attempt fails - a green pipeline with a stale tag looks like a
+          # working deploy.
+          push_tag() {
+            for i in 1 2 3; do
+              buildah push "$1" && return 0
+              echo "Push of $1 failed (attempt $i); retrying"
+              sleep 15
+            done
+            echo "ERROR: could not push $1 after 3 attempts"
+            return 1
+          }
+          push_tag quay.io/uuss/${QUAY_DIRECTORY}:${version}
+          push_tag quay.io/uuss/${QUAY_DIRECTORY}:${dated}

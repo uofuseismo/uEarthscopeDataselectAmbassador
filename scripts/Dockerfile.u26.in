@@ -1,0 +1,47 @@
+# Purpose: Creates the container for running the uEarthscopeDataselectAmbassador
+#          software in a Ubuntu container.
+# Usage: podman build -t uearthscopedataselectambassador:latest -f Dockerfile.u26
+#        buildah bud -t uearthscopedataselectambassador:latest -f Dockerfile.u26
+#
+# Written to run under a restricted Kubernetes securityContext:
+# runAsNonRoot, readOnlyRootFilesystem, allowPrivilegeEscalation: false,
+# and every capability dropped.
+
+FROM ubuntu:26.04 AS unpack
+COPY @PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz /tmp/
+RUN tar -xf /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz -C /tmp
+
+FROM ubuntu:26.04
+
+ARG RUN_UID=10001
+ARG RUN_GID=10001
+
+LABEL version="@PROJECT_VERSION@"
+
+RUN apt-get update &&\
+    apt-get upgrade -y &&\
+    apt-get -y install --no-install-recommends ca-certificates &&\
+    groupadd --system --gid ${RUN_GID} ueat &&\
+    useradd --system --uid ${RUN_UID} --gid ${RUN_GID} \
+            --no-create-home --home-dir /nonexistent \
+            --shell /usr/sbin/nologin ueat &&\
+    apt-get autoremove -y &&\
+    apt-get clean &&\
+    rm -rf /var/lib/apt/lists/* &&\
+    find / -xdev -type f -perm /6000 -exec chmod a-s {} +
+
+# User can execute but not replace binary
+COPY --from=unpack --chown=0:0 --chmod=0555 \
+     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeDataselectAmbassador \
+     /usr/local/bin/uEarthscopeDataselectAmbassador
+
+# Run read-only (i.e. readOnlyRootFilesystem: true, no emptyDir)
+USER ${RUN_UID}:${RUN_GID}
+
+STOPSIGNAL SIGTERM
+
+# CMD and no ENTRYPOINT, so a pod spec supplying command+args replaces this
+# outright.  With an ENTRYPOINT, an args-only override would be appended to
+# the binary instead of replacing it.
+CMD ["/usr/local/bin/uEarthscopeDataselectAmbassador", "--ini=/config/config.ini"]
+

@@ -85,14 +85,14 @@ std::map<std::string, int64_t> MetricsSingleton::getSuccessCounters() const
 }
 
 /// Unauthorized 
-void MetricsSingleton::incrementUnauthorizedCounter() noexcept
+void MetricsSingleton::incrementClientUnauthorizedCounter() noexcept
 {
-    mUnauthorizedCounter.fetch_add(1, std::memory_order_relaxed);        
+    mClientUnauthorizedCounter.fetch_add(1, std::memory_order_relaxed);        
 }
 
-int64_t MetricsSingleton::getUnauthorizedCounts() const noexcept
+int64_t MetricsSingleton::getClientUnauthorizedCounts() const noexcept
 {
-    return mUnauthorizedCounter.load(std::memory_order_relaxed);
+    return mClientUnauthorizedCounter.load(std::memory_order_relaxed);
 }
 
 /*
@@ -108,11 +108,35 @@ int64_t MetricsSingleton::getUnauthenticatedCounts() const noexcept
 }
 */
 
+/// @brief Updates the number of bytes downloaded from Earthscope.
+void MetricsSingleton::incrementBytesDownloadedCounter(const uint32_t nBytes)
+{
+    mBytesDownloadedCounter.fetch_add(nBytes, std::memory_order_relaxed);
+}
+
+int64_t MetricsSingleton::getBytesDownloadedCount() const noexcept
+{
+    return mBytesDownloadedCounter.load(std::memory_order_relaxed);
+}
+
+void MetricsSingleton::incrementEarthscopeRequestsCounter() noexcept
+{
+    mEarthscpoeRequestsCounter.fetch_add(1, std::memory_order_relaxed);
+}
+
+int64_t MetricsSingleton::getEarthscopeRequestsCount() const noexcept
+{
+    return mEarthscpoeRequestsCounter.load(std::memory_order_relaxed);
+}
+
+
 /// Reset
 void MetricsSingleton::resetMetrics() noexcept
 {
-    mUnauthorizedCounter.store(0);
-    mUnauthenticatedCounter.store(0);
+    mClientUnauthorizedCounter.store(0);
+    mClientUnauthenticatedCounter.store(0);
+    mBytesDownloadedCounter.store(0);
+    mEarthscpoeRequestsCounter.store(0);
     const std::scoped_lock lock{mMutex}; 
     for (auto &counter : mServerErrorCounterMap)
     {

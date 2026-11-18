@@ -31,17 +31,25 @@ public:
     /// @result The client error counts for the utilized routes.
     [[nodiscard]] std::map<std::string, int64_t> getClientErrorCounters() const;
 
-    /// @brief Whenever a user hits a route and is unauthorized this
-    ///        gets incremented.
-    void incrementUnauthorizedCounter() noexcept;
-    /// @result The number of unauthenticated attempts.
-    [[nodiscard]] int64_t getUnauthorizedCounts() const noexcept;
+    /// @brief Counts our unauthorized requests to Earthscope.
+    void incrementClientUnauthorizedCounter() noexcept;
+    /// @result The number of unauthorized request to Earthscope.
+    [[nodiscard]] int64_t getClientUnauthorizedCounts() const noexcept;
 
-    /// @brief Whenever a user presents invalid credentials this
-    ///        gets incremented.
-    void incrementUnauthenticatedCounter() noexcept;
-    /// @result The number of unauthenticated attempts.
-    [[nodiscard]] int64_t getUnauthenticatedCounts() const noexcept;
+    /// @brief Counts the number of unauthenticated requests to Earthscope.
+    void incrementClientUnauthenticatedCounter() noexcept;
+    /// @result The number of unauthenticated attempts to EArthscope.
+    [[nodiscard]] int64_t getClientUnauthenticatedCounts() const noexcept;
+
+    /// @brief Updates the number of bytes downloaded from Earthscope.
+    void incrementBytesDownloadedCounter(const uint32_t nBytes);
+    /// @result The number of bytes received.
+    [[nodiscard]] int64_t getBytesDownloadedCount() const noexcept;
+  
+    /// @brief Increments the number of Earthscope requests.
+    void incrementEarthscopeRequestsCounter() noexcept;
+    /// @result The number of Earthscope requests. 
+    [[nodiscard]] int64_t getEarthscopeRequestsCount() const noexcept;
 
     ///  @brief Increments the 200 successes for this route.
     void incrementSuccessCounter(const std::string &route);
@@ -58,8 +66,10 @@ private:
     std::map<std::string, int64_t> mServerErrorCounterMap; // 500 response codes
     std::map<std::string, int64_t> mClientErrorCounterMap; // 400 response codes
     std::map<std::string, int64_t> mSuccessCounterMap;     // 200 response codes
-    std::atomic<int64_t> mUnauthorizedCounter{0};
-    std::atomic<int64_t> mUnauthenticatedCounter{0};
+    std::atomic<int64_t> mClientUnauthorizedCounter{0};
+    std::atomic<int64_t> mClientUnauthenticatedCounter{0};
+    std::atomic<int64_t> mBytesDownloadedCounter{0};
+    std::atomic<int64_t> mEarthscpoeRequestsCounter{0};
 };
 
 /// @brief Initializes the metrics singleton once and for all.  This is to be

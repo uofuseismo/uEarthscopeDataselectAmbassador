@@ -71,7 +71,7 @@ public:
         EarthscopeClient::Error
     > get(const std::string &url) const
     {
-        if (mInitialized)
+        if (!mInitialized)
         {
             SPDLOG_LOGGER_ERROR(mLogger,
                                 "Earthscope client not initialized");

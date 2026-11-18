@@ -35,6 +35,10 @@ struct CrowOptions
             throw std::invalid_argument("Crow bind address is empty");
         }
 
+        options.port
+            = propertyTree.get<uint16_t> (section + "port",
+                                          options.port);
+
         options.serverName
             = propertyTree.get<std::string> (section + "serverName",
                                              options.serverName);

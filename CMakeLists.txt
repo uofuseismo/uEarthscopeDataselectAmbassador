@@ -20,13 +20,14 @@ if (NOT ${BUILD_SHARED_LIBS})
    set(Boost_USE_STATIC_LIBS ON) 
 endif()
 
+find_package(Protobuf CONFIG REQUIRED)
+find_package(gRPC CONFIG REQUIRED)
 if (${WITH_CONAN})
    message("Will use Conan OTLP exporters")
    find_package(opentelemetry-cpp CONFIG COMPONENTS exporter_otlp_grpc exporters_otlp_http REQUIRED)
 else()
    find_package(opentelemetry-cpp CONFIG COMPONENTS exporters_otlp_http REQUIRED)
 endif()
-
 find_package(spdlog REQUIRED)
 find_package(Boost REQUIRED headers program_options url REQUIRED)
 find_package(Threads REQUIRED)
@@ -186,6 +187,7 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    include(Catch)
    set(TEST_SRC
        testing/earthscopeClientOptions.cpp
+       testing/earthscopeClient.cpp
        testing/request.cpp)
    add_executable(unitTests ${TEST_SRC})
    set_target_properties(unitTests PROPERTIES

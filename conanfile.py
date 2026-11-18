@@ -25,7 +25,9 @@ class aqmsDutyReviewBackendConan(ConanFile):
 
    def requirements(self):
        # dependencies
+       self.requires("grpc/1.84.0")
        self.requires("opentelemetry-cpp/1.26.0")
+       self.requires("protobuf/6.33.5")
        self.requires("boost/1.91.0")
        self.requires("spdlog/1.17.0")
        self.requires("crowcpp-crow/1.3.3")

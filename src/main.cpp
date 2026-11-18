@@ -288,6 +288,8 @@ int main(int argc, char *argv[])
         .methods(crow::HTTPMethod::Get)
     ([&](const crow::request &httpRequest) -> crow::response
     {
+        const auto startClock = std::chrono::steady_clock::now();
+        SPDLOG_LOGGER_DEBUG(logger, "Query starting");
         const auto mark = httpRequest.raw_url.find('?');
         const std::string query
         {
@@ -309,7 +311,7 @@ int main(int argc, char *argv[])
             SPDLOG_LOGGER_ERROR(logger, "Failed to parse query: {}", e.what());
             return toErrorResponse(500, "Internal Server Error", "Internal error");
         }
-        const auto startClock = std::chrono::steady_clock::now();
+        //const auto startClock = std::chrono::steady_clock::now();
         auto response = toCrowResponse(earthscopeClient.get(*request), *logger);
         SPDLOG_LOGGER_INFO(
             logger,
@@ -320,7 +322,7 @@ int main(int argc, char *argv[])
             request->getChannel().value_or("*"),
             response.code, response.body.size(),
             std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::steady_clock::now() - startClock).count());
+                std::chrono::steady_clock::now() - startClock).count());
         return response;
     });
 
@@ -339,6 +341,7 @@ int main(int argc, char *argv[])
            SPDLOG_LOGGER_INFO(consoleLogger, "Enabling concurrency");
            app.multithreaded();
         }
+/*
 #ifdef CROW_ENABLE_COMPRESSION
         if (programOptions.crowOptions.useCompression)
         {
@@ -346,6 +349,7 @@ int main(int argc, char *argv[])
             app.use_compression(programOptions.crowOptions.compression);
         }
 #endif
+*/
 #ifdef CROW_ENABLE_SSL
         if (programOptions.crowOptions.useSSL)
         {
@@ -366,6 +370,16 @@ int main(int argc, char *argv[])
         }
 #endif
         app.run();
+        if (!app.is_bound())
+        {
+            SPDLOG_LOGGER_CRITICAL(consoleLogger,
+                                   "Crow failed to start on {}:{}",
+                                   programOptions.crowOptions.bindAddress,
+                                   programOptions.crowOptions.port);
+            //UEarthscopeDataselectAmbassador::Metrics::cleanup(); 
+            UEarthscopeDataselectAmbassador::Logger::cleanup();
+            return EXIT_FAILURE;
+        }
         SPDLOG_LOGGER_INFO(consoleLogger, "Finished running Crow");
         //UEarthscopeDataselectAmbassador::Metrics::cleanup();
         UEarthscopeDataselectAmbassador::Logger::cleanup();
@@ -373,6 +387,7 @@ int main(int argc, char *argv[])
     }
     catch (const std::exception &e)
     {
+        SPDLOG_LOGGER_CRITICAL(consoleLogger, "Critical error: {}", e.what());
         //UEarthscopeDataselectAmbassador::Metrics::cleanup();
         UEarthscopeDataselectAmbassador::Logger::cleanup();
         return EXIT_FAILURE;

@@ -33,23 +33,6 @@ struct HTTPResponse
     return size*nmemb;
 }
 
-/*
-[[nodiscard]] size_t writeToBuffer(char *ptr, const size_t size,
-                                   const size_t nmemb, void *userp)
-{
-    auto *buffer = static_cast<WriteBuffer *> (userp);
-    if (buffer == nullptr){return 0;} 
-    const auto nBytes = size*nmemb;
-    if (buffer->data.size() + nBytes > buffer->maxBytes)
-    {   
-        buffer->exceededLimit = true;
-        return 0; // Aborts the transfer with CURLE_WRITE_ERROR
-    }   
-    buffer->data.append(ptr, nBytes);
-    return nBytes;
-}
-*/
-
 class CURLHandle
 {
 public:
