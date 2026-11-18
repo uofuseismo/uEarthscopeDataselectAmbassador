@@ -11,6 +11,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include "uEarthscopeDataselectAmbassador/earthscopeClient.hpp"
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
+#include "uEarthscopeDataselectAmbassador/metricsSingleton.hpp"
 #include "uEarthscopeDataselectAmbassador/request.hpp"
 #include "curl.hpp"
 
@@ -94,9 +95,13 @@ public:
                                 e.what());
             return std::unexpected(Error::ServerError);
         }
+        auto &metrics
+            = UEarthscopeDataselectAmbassador::Metrics::
+              MetricsSingleton::getInstance();
         // GET request and classify the output
         try
         {
+            metrics.incrementEarthscopeRequestsCounter();
             auto curlResponse = curlHandle->get(url, mLogger.get());
             if (curlResponse.has_value())
             {
@@ -106,6 +111,8 @@ public:
                     std::move(curlResponse->contentType),
                     static_cast<int> (curlResponse->status)
                 };
+                metrics.incrementBytesDownloadedCounter(
+                    response.payload.size());
                 return std::move(response);
             }
             else

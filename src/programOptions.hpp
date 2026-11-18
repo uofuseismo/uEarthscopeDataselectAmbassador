@@ -56,6 +56,7 @@ struct CrowOptions
             throw std::invalid_argument("Crow number of threads not positive");
         }
 
+/*
 #ifdef CROW_ENABLE_COMPRESSION
         auto compressionType
            = propertyTree.get<std::string> (section + "compression",
@@ -84,6 +85,7 @@ struct CrowOptions
                                        + compressionType);
         }
 #endif
+*/
 #ifdef CROW_ENABLE_SSL
         auto certificateFile
             = propertyTree.get_optional<std::string>

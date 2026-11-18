@@ -166,38 +166,6 @@ enum class CodeType : std::uint8_t
     return result;
 }
 
-/*
-/// Validates a code or comma-separated list of codes and returns the
-/// normalized (upper-case) form.
-/// @throws std::invalid_argument if any item is invalid.
-[[nodiscard]] std::string normalizeCode(const std::string_view code,
-                                        const CodeType type)
-{
-    constexpr size_t maxItems{16};
-    std::string result;
-    size_t nItems{0};
-    size_t start{0};
-    while (true)
-    {
-        const auto comma = code.find(',', start);
-        const auto item = code.substr(start,
-            comma == std::string_view::npos ? std::string_view::npos
-                                            : comma - start);
-        if (++nItems > maxItems)
-        {
-            throw std::invalid_argument(
-                std::format("{} list exceeds {} items",
-                            toName(type), maxItems));
-        }
-        if (nItems > 1){result.push_back(',');}
-        result.append(normalizeItem(item, type));
-        if (comma == std::string_view::npos){break;}
-        start = comma + 1;
-    }
-    return result;
-}
-*/
-
 enum class Parameter : std::uint8_t
 { 
     Network = 1,

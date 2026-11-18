@@ -26,6 +26,7 @@
 #include "parseCommandLineOptions.hpp"
 #include "programOptions.hpp"
 #include "logger.hpp"
+#include "metrics.hpp"
 #include "crowHelper.hpp"
 
 /*
@@ -245,7 +246,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    // Parse that ini file
+    // Parse the ini file
     ::ProgramOptions programOptions;
     try
     {
@@ -268,6 +269,20 @@ int main(int argc, char *argv[])
     // Create the logger (and one for crow)
     std::shared_ptr<spdlog::logger> logger{Logger::initialize(programOptions)};
     ::CustomLogger customLogger{logger};
+
+    // Initialize the metrics
+    try 
+    {
+        Metrics::initialize(programOptions);
+        Metrics::createMeters(programOptions);
+    }
+    catch (const std::exception &e) 
+    {
+        SPDLOG_LOGGER_CRITICAL(logger,
+                               "Failed to initialize metrics because {}",
+                               std::string {e.what()});
+        return EXIT_FAILURE;
+    }
 
     // Create the star of the show
     EarthscopeClient
@@ -311,18 +326,38 @@ int main(int argc, char *argv[])
             SPDLOG_LOGGER_ERROR(logger, "Failed to parse query: {}", e.what());
             return toErrorResponse(500, "Internal Server Error", "Internal error");
         }
-        //const auto startClock = std::chrono::steady_clock::now();
-        auto response = toCrowResponse(earthscopeClient.get(*request), *logger);
-        SPDLOG_LOGGER_INFO(
+        SPDLOG_LOGGER_DEBUG(
             logger,
-            "{}.{}.{}.{} -> {} ({} bytes, {} ms)",
+            "Requesting {}.{}.{}.{}",
             request->getNetwork().value_or("*"),
             request->getStation().value_or("*"),
             request->getLocationCode().value_or("*"),
-            request->getChannel().value_or("*"),
-            response.code, response.body.size(),
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - startClock).count());
+            request->getChannel().value_or("*"));
+        //const auto startClock = std::chrono::steady_clock::now();
+        auto response = ::toCrowResponse(earthscopeClient.get(*request), *logger);
+        if (response.code == 200)
+        {
+            SPDLOG_LOGGER_INFO(
+                logger,
+                "{}.{}.{}.{} -> {} ({} bytes, {} ms)",
+                request->getNetwork().value_or("*"),
+                request->getStation().value_or("*"),
+                request->getLocationCode().value_or("*"),
+                request->getChannel().value_or("*"),
+                response.code, response.body.size(),
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - startClock).count());
+        }
+        else
+        {
+            SPDLOG_LOGGER_WARN(
+                logger,
+                "Request for {}.{}.{}.{} failed",
+                request->getNetwork().value_or("*"),
+                request->getStation().value_or("*"),
+                request->getLocationCode().value_or("*"),
+                request->getChannel().value_or("*"));
+        }
         return response;
     });
 
@@ -338,8 +373,8 @@ int main(int argc, char *argv[])
         app.concurrency(programOptions.crowOptions.nThreads);
         if (programOptions.crowOptions.nThreads > 1)
         {
-           SPDLOG_LOGGER_INFO(consoleLogger, "Enabling concurrency");
-           app.multithreaded();
+            SPDLOG_LOGGER_INFO(consoleLogger, "Enabling concurrency");
+            app.multithreaded();
         }
 /*
 #ifdef CROW_ENABLE_COMPRESSION
@@ -376,7 +411,7 @@ int main(int argc, char *argv[])
                                    "Crow failed to start on {}:{}",
                                    programOptions.crowOptions.bindAddress,
                                    programOptions.crowOptions.port);
-            //UEarthscopeDataselectAmbassador::Metrics::cleanup(); 
+            UEarthscopeDataselectAmbassador::Metrics::cleanup(); 
             UEarthscopeDataselectAmbassador::Logger::cleanup();
             return EXIT_FAILURE;
         }
@@ -388,7 +423,7 @@ int main(int argc, char *argv[])
     catch (const std::exception &e)
     {
         SPDLOG_LOGGER_CRITICAL(consoleLogger, "Critical error: {}", e.what());
-        //UEarthscopeDataselectAmbassador::Metrics::cleanup();
+        UEarthscopeDataselectAmbassador::Metrics::cleanup();
         UEarthscopeDataselectAmbassador::Logger::cleanup();
         return EXIT_FAILURE;
     }
