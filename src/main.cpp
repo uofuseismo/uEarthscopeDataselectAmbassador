@@ -339,12 +339,24 @@ int main(int argc, char *argv[])
         {
             SPDLOG_LOGGER_INFO(
                 logger,
-                "{}.{}.{}.{} -> {} ({} bytes, {} ms)",
+                "Successful Earthscope query for {}.{}.{}.{} -> {} ({} bytes, {} ms)",
                 request->getNetwork().value_or("*"),
                 request->getStation().value_or("*"),
                 request->getLocationCode().value_or("*"),
                 request->getChannel().value_or("*"),
                 response.code, response.body.size(),
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - startClock).count());
+        }
+        else if (response.code == 204)
+        {
+            SPDLOG_LOGGER_INFO(
+                logger,
+                "Earthscope query generated no data for {}.{}.{}.{} -> ({} ms)",
+                request->getNetwork().value_or("*"),
+                request->getStation().value_or("*"),
+                request->getLocationCode().value_or("*"),
+                request->getChannel().value_or("*"),
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - startClock).count());
         }
