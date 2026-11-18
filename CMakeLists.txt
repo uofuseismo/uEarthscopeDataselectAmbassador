@@ -97,6 +97,8 @@ set(HEADER_FILES
     include/${PROJECT_NAME}/curlGlobal.hpp
     include/${PROJECT_NAME}/earthscopeClient.hpp
     include/${PROJECT_NAME}/earthscopeClientOptions.hpp
+    include/${PROJECT_NAME}/noDataCache.hpp
+    include/${PROJECT_NAME}/noDataCacheOptions.hpp
     include/${PROJECT_NAME}/metricsSingleton.hpp
     include/${PROJECT_NAME}/request.hpp)
 
@@ -105,6 +107,8 @@ set(LIBRARY_SRC
     src/earthscopeClient.cpp
     src/earthscopeClientOptions.cpp
     src/metricsSingleton.cpp
+    src/noDataCache.cpp
+    src/noDataCacheOptions.cpp
     src/request.cpp
     src/version.cpp)
 

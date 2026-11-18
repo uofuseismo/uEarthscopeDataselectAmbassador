@@ -373,6 +373,25 @@ TEST_CASE("UEarthscopeDataselectAmbassador::Request - parse query",
         REQUIRE(request.toString()
              == EXPECTED_TIMES + "&net=UU&format=miniseed&nodata=204");
     }
+
+    // Captured from the AQMS proxy waveserver on 2026-11-18.  The log
+    // truncated the end times, so those are assumed to share the format.
+    SECTION("AQMS proxy waveserver queries")
+    {
+        const Request request{
+            "net=WY&sta=YTP&loc=01&cha=ENE"
+            "&start=2026-11-18T21:16:10.924&end=2026-11-18T21:21:10.924"};
+        REQUIRE(request.toString()
+             == "start=2026-11-18T21:16:10.924000&end=2026-11-18T21:21:10.924000"
+                "&net=WY&sta=YTP&cha=ENE&loc=01&format=miniseed&nodata=204");
+
+        const Request blankLocation{
+            "net=RC&sta=CMI&loc=--&cha=EHZ"
+            "&start=2026-11-18T21:16:25.186&end=2026-11-18T21:21:25.186"};
+        REQUIRE(blankLocation.toString()
+             == "start=2026-11-18T21:16:25.186000&end=2026-11-18T21:21:25.186000"
+                "&net=RC&sta=CMI&cha=EHZ&loc=--&format=miniseed&nodata=204");
+    }
 }
 
 TEST_CASE("UEarthscopeDataselectAmbassador::Request - parse query rejects",
