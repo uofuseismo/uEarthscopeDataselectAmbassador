@@ -31,10 +31,36 @@ public:
     [[nodiscard]] bool contains(const std::string &key,
                                 const std::chrono::steady_clock::time_point &now) const
     {
+        if (mMaximumEntries == 0){return false;}
         const std::scoped_lock lock{mMutex};
         evictExpiredLocked(now);
         return mIndex.contains(key);
     }
+
+/*
+    [[nodiscard]] 
+    bool check(const std::string &key,
+               const std::chrono::steady_clock::time_point &now)
+    {
+        if (mMaximumEntires == 0){return false;}
+        const std::scoped_lock lock{mMutex};
+        // Remove anything expired
+        evictExpiredLocked(now);
+        // Cache hit?
+        if (mIndex.contains(key)){return true;}
+        // New request - add to the cache
+        // Step 1: Prevent cache from getting too big
+        if (mEntries.size() >= mMaximumEntries)
+        {
+            mIndex.erase(mEntries.front().key);
+            mEntries.pop_front();
+        }
+        // Step 2: Updated
+        mEntries.push_back(Entry{key, now + mTimeToLive});
+        mIndex.emplace(key, std::prev(mEntries.end()));
+        return false;
+    }
+*/
 
     void insert(const std::string &key,
                 const std::chrono::steady_clock::time_point &now)

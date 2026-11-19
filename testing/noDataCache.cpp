@@ -6,10 +6,13 @@
 #include <utility>
 #include <vector>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include "uEarthscopeDataselectAmbassador/noDataCache.hpp"
 #include "uEarthscopeDataselectAmbassador/noDataCacheOptions.hpp"
+#include "temporaryDirectory.hpp"
 
 using namespace UEarthscopeDataselectAmbassador;
+using Testing::TemporaryDirectory;
 
 namespace
 {
@@ -56,6 +59,20 @@ TEST_CASE("UEarthscopeDataselectAmbassador::NoDataCacheOptions",
         REQUIRE_THROWS_AS(options.setTimeToLive(std::chrono::seconds {-1}),
                           std::invalid_argument);
         REQUIRE(options.getTimeToLive() == std::chrono::seconds {150});
+    }
+
+    SECTION("Maximum entries range")
+    {
+        NoDataCacheOptions options;
+        options.setMaximumNumberOfEntries(0);
+        REQUIRE(options.getMaximumNumberOfEntries() == 0);
+        options.setMaximumNumberOfEntries(65535);
+        REQUIRE(options.getMaximumNumberOfEntries() == 65535);
+        REQUIRE_THROWS_AS(options.setMaximumNumberOfEntries(-1),
+                          std::invalid_argument);
+        REQUIRE_THROWS_AS(options.setMaximumNumberOfEntries(65536),
+                          std::invalid_argument);
+        REQUIRE(options.getMaximumNumberOfEntries() == 65535);
     }
 
     SECTION("Copy and move")
@@ -195,5 +212,75 @@ TEST_CASE("UEarthscopeDataselectAmbassador::NoDataCache - maximum entries",
         for (auto &thread : threads){thread.join();}
         REQUIRE(cache.size() <= maximum);
         REQUIRE(cache.size() > 0);
+    }
+}
+
+TEST_CASE("UEarthscopeDataselectAmbassador::NoDataCacheOptions - "
+          "initialization file", "[noDataCache][ini]")
+{
+    const TemporaryDirectory directory;
+
+    SECTION("Missing file")
+    {
+        REQUIRE_THROWS_AS(
+            NoDataCacheOptions::fromInitializationFile(
+                directory.path() / "doesNotExist.ini"),
+            std::invalid_argument);
+    }
+
+    SECTION("Missing section gives the defaults")
+    {
+        const auto ini = directory.write("test.ini",
+            "[Earthscope]\n"
+            "endpoint = http://localhost:8080/fdsnws/dataselect/1\n");
+        const auto options = NoDataCacheOptions::fromInitializationFile(ini);
+        REQUIRE(options.getTimeToLive() == std::chrono::seconds {150});
+        REQUIRE(options.getMaximumNumberOfEntries() == 4096);
+    }
+
+    SECTION("All settings")
+    {
+        const auto ini = directory.write("test.ini",
+            "[NoDataCache]\n"
+            "maximumEntries = 10000\n"
+            "timeToLiveInSeconds = 300\n");
+        const auto options = NoDataCacheOptions::fromInitializationFile(ini);
+        REQUIRE(options.getTimeToLive() == std::chrono::seconds {300});
+        REQUIRE(options.getMaximumNumberOfEntries() == 10000);
+    }
+
+    SECTION("Zero entries disables the cache")
+    {
+        const auto ini = directory.write("test.ini",
+            "[NoDataCache]\n"
+            "maximumEntries = 0\n");
+        const auto options = NoDataCacheOptions::fromInitializationFile(ini);
+        REQUIRE(options.getMaximumNumberOfEntries() == 0);
+    }
+
+    SECTION("Custom section")
+    {
+        const auto ini = directory.write("test.ini",
+            "[NoDataCache]\n"
+            "timeToLiveInSeconds = 300\n"
+            "[NoDataCacheStaging]\n"
+            "timeToLiveInSeconds = 30\n");
+        const auto options = NoDataCacheOptions::fromInitializationFile(
+            ini, "NoDataCacheStaging");
+        REQUIRE(options.getTimeToLive() == std::chrono::seconds {30});
+    }
+
+    // Values outside 0-65535 must not wrap through the uint16_t setter
+    SECTION("Bad settings are rejected")
+    {
+        auto setting = GENERATE(as<std::string> {},
+                                "timeToLiveInSeconds = 0",
+                                "timeToLiveInSeconds = -1",
+                                "maximumEntries = -1",
+                                "maximumEntries = 70000");
+        const auto ini = directory.write("test.ini",
+            "[NoDataCache]\n" + setting + "\n");
+        REQUIRE_THROWS_AS(NoDataCacheOptions::fromInitializationFile(ini),
+                          std::invalid_argument);
     }
 }

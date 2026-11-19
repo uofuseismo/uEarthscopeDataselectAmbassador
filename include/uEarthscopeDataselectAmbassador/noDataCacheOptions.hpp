@@ -21,15 +21,16 @@ public:
     NoDataCacheOptions(NoDataCacheOptions &&options) noexcept;
 
     /// @brief Sets the cached request's time to live.
+    /// @throw std::invalid_argument if this is not positive.
     void setTimeToLive(const std::chrono::milliseconds &requestTimeToLive);
     /// @result The cached request's time to live.
-    /// @throw std::invalid_argument if this is not positive.
     /// @note By default this is 150 seconds (2.5 minutes).
     [[nodiscard]] std::chrono::milliseconds getTimeToLive() const noexcept;
 
     /// @brief Sets the maximum number of entires in the cache.
     /// @note Setting to zero disables the cache.
-    void setMaximumNumberOfEntries(uint16_t maximumRetries);
+    /// @throws std::invalid_argument if this not in the range of [0, 65535].
+    void setMaximumNumberOfEntries(int maximumRetries);
     /// @result The maximum number of entires in the cache.
     /// @note By default this is 4096.
     [[nodiscard]] int getMaximumNumberOfEntries() const noexcept;

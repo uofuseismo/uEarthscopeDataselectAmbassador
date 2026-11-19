@@ -82,90 +82,110 @@ public:
         {
             return std::unexpected(Error::EmptyURL);
         } 
-        // Create the curl handle
-        std::unique_ptr<CURLHandle> curlHandle{nullptr}; 
-        try 
-        {   
-            curlHandle = mCURLFactory.create(mOptions, mUseToken);
-        }
-        catch (const std::exception &e) 
-        {
-            SPDLOG_LOGGER_ERROR(mLogger,
-                                "Failed to create curl handle; failed with {}",
-                                e.what());
-            return std::unexpected(Error::ServerError);
-        }
         auto &metrics
             = UEarthscopeDataselectAmbassador::Metrics::
               MetricsSingleton::getInstance();
-        // GET request and classify the output
-        try
+        // Handle retries
+        constexpr int maximumAttempts{2};
+        for (int attempt = 1; attempt <= maximumAttempts; ++attempt)
         {
-            metrics.incrementEarthscopeRequestsCounter();
-            auto curlResponse = curlHandle->get(url, mLogger.get());
-            if (curlResponse.has_value())
+            // Create the curl handle
+            std::unique_ptr<CURLHandle> curlHandle{nullptr}; 
+            try 
             {
-                Response response
-                {
-                    std::move(curlResponse->body),
-                    std::move(curlResponse->contentType),
-                    static_cast<int> (curlResponse->status)
-                };
-                metrics.incrementBytesDownloadedCounter(
-                    response.payload.size());
-                return std::move(response);
+                curlHandle = mCURLFactory.create(mOptions, mUseToken);
             }
-            else
+            catch (const std::exception &e) 
             {
-                if (curlResponse.error() == CURLHandle::Error::InvalidURL)
+                SPDLOG_LOGGER_ERROR(mLogger,
+                    "Failed to create curl handle; failed with {}",
+                    e.what());
+                return std::unexpected(Error::ServerError);
+            }
+            // GET request and classify the output
+            try
+            {
+                metrics.incrementEarthscopeRequestsCounter();
+                if (attempt > 1){metrics.incrementEarthscopeRetriesCounter();}
+                auto curlResponse = curlHandle->get(url, mLogger.get());
+                if (curlResponse.has_value())
                 {
-                    return std::unexpected(Error::InvalidRequest);
-                }
-                else if (curlResponse.error() ==
-                         CURLHandle::Error::InvalidCURLOption)
-                {
-                    return std::unexpected(Error::ServerError);
-                }
-                else if (curlResponse.error() ==
-                         CURLHandle::Error::Uninitialized)
-                {
-                    return std::unexpected(Error::ServerError);
-                }
-                else if (curlResponse.error() == CURLHandle::Error::TimedOut)
-                {
-                    return std::unexpected(Error::TimedOut);
-                }
-                else if (curlResponse.error() ==
-                         CURLHandle::Error::ConnectionFailed)
-                {
-                    return std::unexpected(Error::ConnectionFailure);
-                }
-                else if (curlResponse.error() == CURLHandle::Error::TLSFailed)
-                {
-                    return std::unexpected(Error::ServerError);
-                }
-                else if (curlResponse.error() == CURLHandle::Error::TooLarge)
-                {
-                    return std::unexpected(Error::TooLarge);
-                }
-                else if (curlResponse.error() == CURLHandle::Error::Other)
-                {
-                    return std::unexpected(Error::ServerError);
+                    Response response
+                    {
+                        std::move(curlResponse->body),
+                        std::move(curlResponse->contentType),
+                        static_cast<int> (curlResponse->status)
+                    };
+                    metrics.incrementBytesDownloadedCounter(
+                        response.payload.size());
+                    return std::move(response);
                 }
                 else
                 {
-                    SPDLOG_LOGGER_ERROR(mLogger, "Unhandled cURL error");
+                    // Quick check on timeout and retry
+                    if (curlResponse.error() == CURLHandle::Error::TimedOut &&
+                        attempt < maximumAttempts)
+                    {
+                        SPDLOG_LOGGER_WARN(
+                            mLogger,
+                            "Earthscope request timed out; will retry");
+                        continue;
+                    }
+                    // Okay handle the error
+                    return std::unexpected(checkError(curlResponse.error())); 
                 }
+            }
+            catch (const std::exception &e)
+            {
+                SPDLOG_LOGGER_ERROR(mLogger,
+                    "Failed to issue curl request; failed with {}",
+                    e.what());
                 return std::unexpected(Error::ServerError);
             }
-        }
-        catch (const std::exception &e)
+        } // Loop on retries
+        SPDLOG_LOGGER_ERROR(mLogger, "Failed to handle return logic");
+        return std::unexpected(Error::ServerError);
+    }
+
+    [[nodiscard]] Error checkError(const CURLHandle::Error error) const noexcept
+    {
+        if (error == CURLHandle::Error::InvalidURL)
         {
-            SPDLOG_LOGGER_ERROR(mLogger,
-                                "Failed to issued curl request; failed with {}",
-                                e.what());
-            return std::unexpected(Error::ServerError);
+            return Error::InvalidRequest;
         }
+        else if (error == CURLHandle::Error::InvalidCURLOption)
+        {
+            return Error::ServerError;
+        }
+        else if (error == CURLHandle::Error::Uninitialized)
+        {
+            return Error::ServerError;
+        }
+        else if (error == CURLHandle::Error::TimedOut)
+        {
+            return Error::TimedOut;
+        }
+        else if (error == CURLHandle::Error::ConnectionFailed)
+        {
+            return Error::ConnectionFailure;
+        }
+        else if (error == CURLHandle::Error::TLSFailed)
+        {
+            return Error::ServerError;
+        }
+        else if (error == CURLHandle::Error::TooLarge)
+        {
+            return Error::TooLarge;
+        }
+        else if (error == CURLHandle::Error::Other)
+        {
+            return Error::ServerError;
+        }
+        else
+        {
+            SPDLOG_LOGGER_ERROR(mLogger, "Unhandled cURL error");
+        }
+        return Error::ServerError;
     }
 
     EarthscopeClientOptions mOptions;

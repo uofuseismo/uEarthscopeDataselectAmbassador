@@ -219,6 +219,20 @@ public:
                   "Failed to set max response size");
     }
 
+    void setLowSpeedLimit(const int lowSpeedLimit)
+    {
+        setOption(CURLOPT_LOW_SPEED_LIMIT,
+                  static_cast<long> (lowSpeedLimit),
+                  "Failed to set low speed limit");
+    }
+
+    void setLowSpeedTime(const int lowSpeedTime)
+    {
+        setOption(CURLOPT_LOW_SPEED_TIME,
+                  static_cast<long> (lowSpeedTime),
+                  "Failed to set low speed time");
+    }
+
     void setBearerAuth(const std::string &token)
     {   
         setOption(CURLOPT_HTTPAUTH,
@@ -275,6 +289,13 @@ public:
         handle->setRequestTimeOut(options.getRequestTimeOut());
         handle->setMaximumResponseSizeInBytes(
             options.getMaximumResponseSizeInBytes());
+        // While developing it was observed about one in 7'ish requests
+        // stalled.  These options help speed up how fast we can get a
+        // TIMEDOUT problem back to our client. 
+        constexpr int lowSpeedLimit{1};
+        constexpr int lowSpeedTime{5};
+        handle->setLowSpeedLimit(lowSpeedLimit);
+        handle->setLowSpeedTime(lowSpeedTime);
         if (!useToken)
         {
             handle->setDigestAuth(options.getLegacyCredentials());

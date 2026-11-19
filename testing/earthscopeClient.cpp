@@ -7,6 +7,7 @@
 #include "uEarthscopeDataselectAmbassador/earthscopeClient.hpp"
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
 #include "uEarthscopeDataselectAmbassador/request.hpp"
+#include "fakeServer.hpp"
 
 using namespace UEarthscopeDataselectAmbassador;
 
@@ -59,5 +60,46 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClient", "[client]")
         const auto result = client.get(makeRequest());
         REQUIRE_FALSE(result.has_value());
         REQUIRE(result.error() == EarthscopeClient::Error::ConnectionFailure);
+    }
+}
+
+// EarthScope's origin sometimes sits ~21 s before the first byte.  The
+// low-speed limit (no bytes for 5 s) should end each stalled attempt well
+// before the request timeout, and the client should retry once.
+TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClient - stalls",
+          "[client][stall]")
+{
+    using Testing::FakeServer;
+    const CURLGlobal curlGlobal;
+    auto options = makeOptions();
+    options.setRequestTimeOut(std::chrono::seconds {30});
+
+    SECTION("A stalled attempt is retried and the retry succeeds")
+    {
+        const FakeServer server{FakeServer::Mode::StallThenRespond};
+        options.setEndpoint(server.endpoint());
+        const EarthscopeClient client{options, curlGlobal, nullptr};
+        const auto start = std::chrono::steady_clock::now();
+        const auto result = client.get(makeRequest());
+        const auto elapsed = std::chrono::steady_clock::now() - start;
+        REQUIRE(result.has_value());
+        REQUIRE(result->status == 200);
+        REQUIRE(result->payload == FakeServer::PAYLOAD);
+        REQUIRE(server.connections() == 2);
+        REQUIRE(elapsed < std::chrono::seconds {10});
+    }
+
+    SECTION("Two stalls give up as timed out, well before the request timeout")
+    {
+        const FakeServer server{FakeServer::Mode::Stall};
+        options.setEndpoint(server.endpoint());
+        const EarthscopeClient client{options, curlGlobal, nullptr};
+        const auto start = std::chrono::steady_clock::now();
+        const auto result = client.get(makeRequest());
+        const auto elapsed = std::chrono::steady_clock::now() - start;
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == EarthscopeClient::Error::TimedOut);
+        REQUIRE(server.connections() == 2);
+        REQUIRE(elapsed < std::chrono::seconds {15});
     }
 }

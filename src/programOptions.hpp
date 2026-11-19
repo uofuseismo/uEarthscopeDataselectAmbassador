@@ -195,7 +195,7 @@ struct ProgramOptions
         // No data cache
         noDataCacheOptions
             = NoDataCacheOptions::fromInitializationFile(
-                 iniFile, "NoDataCach"); 
+                 iniFile, "NoDataCache"); 
 
         // Crow
         crowOptions

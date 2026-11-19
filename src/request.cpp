@@ -586,7 +586,6 @@ std::string Request::toString() const
     {
         throw std::runtime_error("Start and end time not set");
     }
-
     // URL says it's required - start here so I don't need annoying
     // logic to append amperstands
     std::string query;
@@ -625,5 +624,6 @@ std::string Request::toString() const
     {
         query.append("&nodata=204");
     }
+ 
     return query;
 }

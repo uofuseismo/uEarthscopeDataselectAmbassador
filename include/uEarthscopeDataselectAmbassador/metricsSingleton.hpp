@@ -51,6 +51,12 @@ public:
     /// @result The number of Earthscope requests. 
     [[nodiscard]] int64_t getEarthscopeRequestsCount() const noexcept;
 
+    /// @brief Increments the number of Earthscope retried requests.
+    void incrementEarthscopeRetriesCounter() noexcept;
+    /// @result The number of Earthscope retried requests. 
+    [[nodiscard]] int64_t getEarthscopeRetriesCount() const noexcept;
+
+
     ///  @brief Increments the 200 successes for this route.
     void incrementSuccessCounter(const std::string &route);
     /// @result The success counts for the utilized routes.
@@ -69,7 +75,8 @@ private:
     std::atomic<int64_t> mClientUnauthorizedCounter{0};
     std::atomic<int64_t> mClientUnauthenticatedCounter{0};
     std::atomic<int64_t> mBytesDownloadedCounter{0};
-    std::atomic<int64_t> mEarthscpoeRequestsCounter{0};
+    std::atomic<int64_t> mEarthscopeRequestsCounter{0};
+    std::atomic<int64_t> mEarthscopeRetriesCounter{0};
 };
 
 /// @brief Initializes the metrics singleton once and for all.  This is to be

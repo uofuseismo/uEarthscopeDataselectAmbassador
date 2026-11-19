@@ -108,7 +108,7 @@ int64_t MetricsSingleton::getUnauthenticatedCounts() const noexcept
 }
 */
 
-/// @brief Updates the number of bytes downloaded from Earthscope.
+/// Number of bytes downloaded from Earthscope
 void MetricsSingleton::incrementBytesDownloadedCounter(const uint32_t nBytes)
 {
     mBytesDownloadedCounter.fetch_add(nBytes, std::memory_order_relaxed);
@@ -119,14 +119,26 @@ int64_t MetricsSingleton::getBytesDownloadedCount() const noexcept
     return mBytesDownloadedCounter.load(std::memory_order_relaxed);
 }
 
+// Earthscope request counter
 void MetricsSingleton::incrementEarthscopeRequestsCounter() noexcept
 {
-    mEarthscpoeRequestsCounter.fetch_add(1, std::memory_order_relaxed);
+    mEarthscopeRequestsCounter.fetch_add(1, std::memory_order_relaxed);
 }
 
 int64_t MetricsSingleton::getEarthscopeRequestsCount() const noexcept
 {
-    return mEarthscpoeRequestsCounter.load(std::memory_order_relaxed);
+    return mEarthscopeRequestsCounter.load(std::memory_order_relaxed);
+}
+
+// Earthscope retry counter
+void MetricsSingleton::incrementEarthscopeRetriesCounter() noexcept
+{
+    mEarthscopeRetriesCounter.fetch_add(1, std::memory_order_relaxed);
+}
+
+int64_t MetricsSingleton::getEarthscopeRetriesCount() const noexcept
+{
+    return mEarthscopeRetriesCounter.load(std::memory_order_relaxed);
 }
 
 
@@ -136,7 +148,8 @@ void MetricsSingleton::resetMetrics() noexcept
     mClientUnauthorizedCounter.store(0);
     mClientUnauthenticatedCounter.store(0);
     mBytesDownloadedCounter.store(0);
-    mEarthscpoeRequestsCounter.store(0);
+    mEarthscopeRequestsCounter.store(0);
+    mEarthscopeRetriesCounter.store(0);
     const std::scoped_lock lock{mMutex}; 
     for (auto &counter : mServerErrorCounterMap)
     {

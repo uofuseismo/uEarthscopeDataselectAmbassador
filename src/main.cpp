@@ -21,6 +21,7 @@
 //NOLINTNEXTLINE(misc-include-cleaner)
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
 #include "uEarthscopeDataselectAmbassador/metricsSingleton.hpp"
+#include "uEarthscopeDataselectAmbassador/noDataCache.hpp"
 #include "uEarthscopeDataselectAmbassador/request.hpp"
 #include "uEarthscopeDataselectAmbassador/version.hpp"
 #include "parseCommandLineOptions.hpp"
@@ -290,7 +291,14 @@ int main(int argc, char *argv[])
                          curlGlobal,
                          logger};
 
-    // 
+    // Limiter to back off on 204 errors and not crush our request quota
+    std::unique_ptr<NoDataCache> noDataCache{nullptr};
+    if (programOptions.noDataCacheOptions.getMaximumNumberOfEntries() > 0)
+    {
+        noDataCache
+            = std::make_unique<NoDataCache> (programOptions.noDataCacheOptions);
+    }
+
     crow::logger::setHandler(&customLogger);
     crow::SimpleApp app;
     CROW_ROUTE(app, "/")
@@ -304,7 +312,7 @@ int main(int argc, char *argv[])
     ([&](const crow::request &httpRequest) -> crow::response
     {
         const auto startClock = std::chrono::steady_clock::now();
-        SPDLOG_LOGGER_DEBUG(logger, "Query starting");
+        SPDLOG_LOGGER_DEBUG(logger, "GET query starting");
         const auto mark = httpRequest.raw_url.find('?');
         const std::string query
         {
@@ -319,12 +327,30 @@ int main(int argc, char *argv[])
         catch (const std::invalid_argument &e)
         {
             SPDLOG_LOGGER_DEBUG(logger, "Rejected query: {}", e.what());
-            return toErrorResponse(400, "Bad Request", e.what());
+            return ::toErrorResponse(400, "Bad Request", e.what());
         }
         catch (const std::exception &e)
         {
             SPDLOG_LOGGER_ERROR(logger, "Failed to parse query: {}", e.what());
-            return toErrorResponse(500, "Internal Server Error", "Internal error");
+            return ::toErrorResponse(500, "Internal Server Error", "Internal error");
+        }
+        // In the cache?
+        std::string cacheKey;
+        if (noDataCache != nullptr)
+        {
+            cacheKey = request->toString();
+            try
+            {
+                if (noDataCache->contains(cacheKey))
+                {
+                    return crow::response{204};
+                }
+            }
+            catch (const std::exception &e)
+            {
+                SPDLOG_LOGGER_WARN(logger, "Failed to check cache because {}",
+                                   e.what());
+            }
         }
         SPDLOG_LOGGER_DEBUG(
             logger,
@@ -350,6 +376,19 @@ int main(int argc, char *argv[])
         }
         else if (response.code == 204)
         {
+            if (noDataCache != nullptr)
+            {
+                try
+                {
+                    noDataCache->insert(cacheKey);
+                }
+                catch (const std::exception &e)
+                {
+                    SPDLOG_LOGGER_WARN(logger,
+                                       "Failed to update cache because {}",
+                                       e.what() );
+                }
+            }
             SPDLOG_LOGGER_INFO(
                 logger,
                 "Earthscope query generated no data for {}.{}.{}.{} -> ({} ms)",

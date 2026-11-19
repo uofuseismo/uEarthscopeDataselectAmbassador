@@ -1,5 +1,4 @@
 #include <chrono>
-#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
@@ -64,8 +63,12 @@ NoDataCacheOptions::operator=(NoDataCacheOptions &&options) noexcept
 }
 
 /// Maximum number of entries
-void NoDataCacheOptions::setMaximumNumberOfEntries(const uint16_t maxEntries)
+void NoDataCacheOptions::setMaximumNumberOfEntries(const int maxEntries)
 {
+    if (maxEntries < 0 || maxEntries > 65535)
+    {
+        throw std::invalid_argument("Maximum entries must be in [0, 65535]");
+    }
     pImpl->mMaximumEntries = static_cast<int> (maxEntries);
 }
 

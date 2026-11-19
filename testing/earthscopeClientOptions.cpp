@@ -1,56 +1,18 @@
 #include <chrono>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <random>
 #include <stdexcept>
 #include <string>
-#include <system_error>
 #include <utility>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
+#include "temporaryDirectory.hpp"
 
 using namespace UEarthscopeDataselectAmbassador;
+using Testing::TemporaryDirectory;
 
 namespace
 {
-
-/// A scratch directory that is removed when the test case ends, pass or fail.
-class TemporaryDirectory
-{
-public:
-    TemporaryDirectory()
-    {
-        std::random_device device;
-        std::uniform_int_distribution<std::uint64_t> distribution;
-        mPath = std::filesystem::temp_directory_path()
-              / ("uEarthscopeDataselectAmbassadorTest_"
-                + std::to_string(distribution(device)));
-        std::filesystem::create_directories(mPath);
-    }
-    TemporaryDirectory(const TemporaryDirectory &) = delete;
-    TemporaryDirectory& operator=(const TemporaryDirectory &) = delete;
-    ~TemporaryDirectory()
-    {
-        std::error_code error;
-        std::filesystem::remove_all(mPath, error);
-    }
-    /// Writes contents to name inside the directory and returns its path.
-    [[nodiscard]] std::filesystem::path write(const std::string &name,
-                                              const std::string &contents) const
-    {
-        auto path = mPath / name;
-        std::ofstream file(path);
-        file << contents;
-        return path;
-    }
-    [[nodiscard]] const std::filesystem::path &path() const noexcept
-    {
-        return mPath;
-    }
-private:
-    std::filesystem::path mPath;
-};
 
 // Obviously fake credentials - never put real ones in a test
 const std::string USER{"fake.user@example.org"};
@@ -74,6 +36,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions",
         REQUIRE(options.getConnectTimeOut() == std::chrono::seconds {5});
         REQUIRE(options.getMaximumResponseSizeInBytes()
              == int64_t {32}*1024*1024);
+        REQUIRE(options.getMaximumRequestsPerSecond() == 500);
         REQUIRE_THROWS_AS(options.getAccessToken(), std::runtime_error);
         REQUIRE_THROWS_AS(options.getLegacyCredentials(), std::runtime_error);
     }
@@ -151,14 +114,29 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions",
                           std::invalid_argument);
     }
 
+    SECTION("Maximum requests per second")
+    {
+        options.setMaximumRequestsPerSecond(20);
+        REQUIRE(options.getMaximumRequestsPerSecond() == 20);
+        options.setMaximumRequestsPerSecond(1);
+        REQUIRE(options.getMaximumRequestsPerSecond() == 1);
+        REQUIRE_THROWS_AS(options.setMaximumRequestsPerSecond(0),
+                          std::invalid_argument);
+        REQUIRE_THROWS_AS(options.setMaximumRequestsPerSecond(-1),
+                          std::invalid_argument);
+        REQUIRE(options.getMaximumRequestsPerSecond() == 1);
+    }
+
     SECTION("Copy and move")
     {
         options.setAccessToken(TOKEN);
         options.setRequestTimeOut(std::chrono::seconds {3});
+        options.setMaximumRequestsPerSecond(20);
 
         EarthscopeClientOptions copy{options};
         REQUIRE(copy.getAccessToken() == TOKEN);
         REQUIRE(copy.getRequestTimeOut() == std::chrono::seconds {3});
+        REQUIRE(copy.getMaximumRequestsPerSecond() == 20);
 
         // The copy is deep
         copy.setRequestTimeOut(std::chrono::seconds {4});
@@ -254,6 +232,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
         REQUIRE(options.getConnectTimeOut() == std::chrono::seconds {5});
         REQUIRE(options.getMaximumResponseSizeInBytes()
              == int64_t {32}*1024*1024);
+        REQUIRE(options.getMaximumRequestsPerSecond() == 500);
     }
 
     SECTION("All settings")
@@ -265,9 +244,11 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
             "password = " + PASSWORD + "\n"
             "requestTimeOutInSeconds = 30\n"
             "connectTimeOutInSeconds = 2\n"
-            "maximumResponseSizeInMegabytes = 64\n");
+            "maximumResponseSizeInMegabytes = 64\n"
+            "maximumRequestsPerSecond = 20\n");
         const auto options
             = EarthscopeClientOptions::fromInitializationFile(ini);
+        REQUIRE(options.getMaximumRequestsPerSecond() == 20);
         REQUIRE(options.getEndpoint()
              == "http://localhost:8080/fdsnws/dataselect/1");
         REQUIRE(options.getRequestTimeOut() == std::chrono::seconds {30});
@@ -372,11 +353,15 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
 
     SECTION("Non-positive settings are rejected")
     {
+        auto setting = GENERATE(as<std::string> {},
+                                "requestTimeOutInSeconds = 0",
+                                "maximumRequestsPerSecond = 0",
+                                "maximumRequestsPerSecond = -5");
         const auto ini = directory.write("test.ini",
             "[Earthscope]\n"
             "user = " + USER + "\n"
             "password = " + PASSWORD + "\n"
-            "requestTimeOutInSeconds = 0\n");
+            + setting + "\n");
         REQUIRE_THROWS_AS(
             EarthscopeClientOptions::fromInitializationFile(ini),
             std::invalid_argument);

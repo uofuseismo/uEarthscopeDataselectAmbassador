@@ -10,8 +10,11 @@ namespace UEarthscopeDataselectAmbassador
 
 namespace UEarthscopeDataselectAmbassador
 {
+/// @class NoDataCache noDataCacheOptions.hpp
 /// @brief This is a way to reject repeat requests quickly and not count
 ///        against our usage quota.
+/// @copyright Ben Baker (University of Utah) distributed under the
+///            MIT NO AI license.
 class NoDataCache
 {
 public:
@@ -21,7 +24,7 @@ public:
     /// @result True indicates the request is in the cache.
     [[nodiscard]] bool contains(const std::string &key,
                                 const std::chrono::steady_clock::time_point &now = std::chrono::steady_clock::now()) const; 
-
+    /// @brief Inserts the request into the cache.
     void insert(const std::string &key,
                 const std::chrono::steady_clock::time_point &now = std::chrono::steady_clock::now());
 

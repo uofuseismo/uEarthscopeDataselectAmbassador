@@ -40,6 +40,8 @@ opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     bytesDownloadedCounter{nullptr};
 opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     earthscopeRequestsCounter{nullptr};
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    earthscopeRetriesCounter{nullptr};
 
 
 
@@ -243,6 +245,34 @@ void observeEarthscopeRequestCounts(
     }
 }
 
+// Earthscope retries counts
+void observeEarthscopeRetriesCounts(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        // N.B. these should all be noexcepts
+        auto &instance
+            = UEarthscopeDataselectAmbassador::Metrics::
+                 MetricsSingleton::getInstance();
+        observer->Observe(instance.getEarthscopeRetriesCount());
+    }
+}
+
 // Earthscope data downloaded
 void observeEarthscopeBytesDownloaded(
     opentelemetry::metrics::ObserverResult observerResult,
@@ -332,10 +362,20 @@ void createMeters(const ::ProgramOptions &options)
     earthscopeRequestsCounter
         = meter->CreateInt64ObservableCounter(
              "seismic_data.earthscope.client.requests",
-             "Number of request made to Earthscope",
+             "Number of requests made to Earthscope",
              "{request}"); 
     earthscopeRequestsCounter->AddCallback(
         ::observeEarthscopeRequestCounts, nullptr);
+
+    // Earthscope retries coutns
+    earthscopeRequestsCounter
+        = meter->CreateInt64ObservableCounter(
+             "seismic_data.earthscope.client.retried_requests",
+             "Number of retried requests made to Earthscope",
+             "{request}"); 
+    earthscopeRequestsCounter->AddCallback(
+        ::observeEarthscopeRetriesCounts, nullptr);
+
 
     // Data download
     bytesDownloadedCounter
