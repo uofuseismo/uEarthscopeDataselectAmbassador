@@ -112,7 +112,7 @@ NoDataCacheOptions::fromInitializationFile(
 
     NoDataCacheOptions options;
     auto section = sectionIn;
-    if (section.empty()){section = "NoDataCacheOptions";}
+    if (section.empty()){section = "NoDataCache";}
     if (section.back() != '.'){section.append(".");}
     options.setMaximumNumberOfEntries(
          propertyTree.get<int> (section + "maximumEntries",
