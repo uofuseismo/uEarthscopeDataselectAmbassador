@@ -86,7 +86,7 @@ public:
     /// @note By default this is false - i.e., no data is a 204 error.
     [[nodiscard]] bool noDataIs404() const noexcept;
 
-    /// @result The parameters to append to the serverice.earthscope.org/fdsnws/dataselect/1/query[auth]? base URL 
+    /// @result The parameters to append to the service.earthscope.org/fdsnws/dataselect/1/query[auth]? base URL 
     [[nodiscard]] std::string toString() const;
 
     /// @brief Destructor.
