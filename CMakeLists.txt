@@ -94,6 +94,7 @@ configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
                ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}/version.hpp)
 
 set(HEADER_FILES 
+    include/${PROJECT_NAME}/bulkRequest.hpp
     include/${PROJECT_NAME}/curlGlobal.hpp
     include/${PROJECT_NAME}/earthscopeClient.hpp
     include/${PROJECT_NAME}/earthscopeClientOptions.hpp
@@ -104,6 +105,7 @@ set(HEADER_FILES
     include/${PROJECT_NAME}/request.hpp)
 
 set(LIBRARY_SRC
+    src/bulkRequest.cpp
     src/curlGlobal.cpp
     src/earthscopeClient.cpp
     src/earthscopeClientOptions.cpp

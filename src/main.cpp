@@ -348,6 +348,13 @@ int main(int argc, char *argv[])
             {
                 if (noDataCache->contains(cacheKey))
                 {
+                    metrics.increment204CacheHitCounter();
+                    SPDLOG_LOGGER_DEBUG(logger,
+                        "Cache hit {}.{}.{}.{}", 
+                        request->getNetwork().value_or("*"),
+                        request->getStation().value_or("*"),
+                        request->getLocationCode().value_or("*"),
+                        request->getChannel().value_or("*"));
                     return crow::response{204};
                 }
             }
@@ -438,6 +445,7 @@ int main(int argc, char *argv[])
                            "Starting Crow on {}:{}",
                            programOptions.crowOptions.bindAddress,
                            programOptions.crowOptions.port);
+        app.loglevel(crow::LogLevel::Warning);
         app.bindaddr(programOptions.crowOptions.bindAddress)
            .port(programOptions.crowOptions.port)
            .server_name(programOptions.crowOptions.serverName);

@@ -95,6 +95,17 @@ int64_t MetricsSingleton::getClientUnauthorizedCounts() const noexcept
     return mClientUnauthorizedCounter.load(std::memory_order_relaxed);
 }
 
+/// 204 cache hit
+void MetricsSingleton::increment204CacheHitCounter()
+{
+    m204CacheHitCounter.fetch_add(1, std::memory_order_relaxed);
+}
+
+int64_t MetricsSingleton::get204CacheHitCount() const noexcept
+{
+    return m204CacheHitCounter.load(std::memory_order_relaxed);
+}
+
 /*
 /// Unauthenticated
 void MetricsSingleton::incrementUnauthenticatedCounter() noexcept
@@ -163,6 +174,7 @@ void MetricsSingleton::resetMetrics() noexcept
     mEarthscopeRequestsCounter.store(0);
     mEarthscopeRetriesCounter.store(0);
     mRateLimitedRequestsCounter.store(0);
+    m204CacheHitCounter.store(0);
     for (auto &counter : mServerErrorCounterMap)
     {
         counter.second = 0;

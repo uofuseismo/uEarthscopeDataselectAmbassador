@@ -56,6 +56,12 @@ public:
     /// @result The number of Earthscope retried requests. 
     [[nodiscard]] int64_t getEarthscopeRetriesCount() const noexcept;
 
+    /// @brief Increments the number of requests rejected because they are
+    ///        repeats of 204 requests.
+    void increment204CacheHitCounter(); 
+    /// @result The number of cahe hit counts.
+    [[nodiscard]] int64_t get204CacheHitCount() const noexcept;
+
     /// @brief Increments the number of rate limited requests.
     void incrementRateLimitedRequests() noexcept;
     /// @result The number of rate limited requests.
@@ -78,6 +84,7 @@ private:
     std::map<std::string, int64_t> mSuccessCounterMap;     // 200 response codes
     std::atomic<int64_t> mClientUnauthorizedCounter{0};
     std::atomic<int64_t> mClientUnauthenticatedCounter{0};
+    std::atomic<int64_t> m204CacheHitCounter{0};
     std::atomic<int64_t> mRateLimitedRequestsCounter{0};
     std::atomic<int64_t> mBytesDownloadedCounter{0};
     std::atomic<int64_t> mEarthscopeRequestsCounter{0};

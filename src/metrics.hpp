@@ -44,6 +44,8 @@ opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     earthscopeRetriesCounter{nullptr};
 opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     rateLimitedCounter{nullptr};
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    cache204HitCounter{nullptr};
 
 
 
@@ -332,7 +334,33 @@ void observeRateLimitedRequestsCounts(
     }   
 }
 
-
+// 204 cache hit rejects
+void observe204CacheHits(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{   
+    if (opentelemetry::nostd::holds_alternative
+        <    
+            opentelemetry::nostd::shared_ptr
+            <                   
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {   
+        auto observer = opentelemetry::nostd::get
+        <                       
+            opentelemetry::nostd::shared_ptr
+            < 
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        // N.B. these should all be noexcepts
+        auto &instance
+            = UEarthscopeDataselectAmbassador::Metrics::
+                 MetricsSingleton::getInstance();
+        observer->Observe(instance.get204CacheHitCount());
+    }
+}
 
 }
 
@@ -427,7 +455,14 @@ void createMeters(const ::ProgramOptions &options)
     bytesDownloadedCounter->AddCallback(
         ::observeEarthscopeBytesDownloaded, nullptr); 
 
-
+    // 204 cache hits
+    cache204HitCounter
+        = meter->CreateInt64ObservableCounter(
+             "seismic_data.earthscope.server.no_data_cache_hit_rejections",
+             "Amount of requests rejected because they are duplicates of previous 204 requests",
+             "{request}");
+    bytesDownloadedCounter->AddCallback(
+        ::observe204CacheHits, nullptr); 
 /*
     // 200 counts from earthscope
     clientSuccessCounter
