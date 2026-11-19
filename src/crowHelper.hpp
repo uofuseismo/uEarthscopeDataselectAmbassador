@@ -108,9 +108,6 @@ namespace
     SPDLOG_LOGGER_WARN(&logger,
                        "Unexpected EarthScope status {}",
                         upstream.status);
-    SPDLOG_LOGGER_WARN(&logger,
-                       "Unexpected EarthScope status {}",
-                        upstream.status);
     if (upstream.status >= 500)
     {
         return ::toErrorResponse(503,

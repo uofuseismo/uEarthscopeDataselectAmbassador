@@ -97,9 +97,10 @@ set(HEADER_FILES
     include/${PROJECT_NAME}/curlGlobal.hpp
     include/${PROJECT_NAME}/earthscopeClient.hpp
     include/${PROJECT_NAME}/earthscopeClientOptions.hpp
+    include/${PROJECT_NAME}/metricsSingleton.hpp
     include/${PROJECT_NAME}/noDataCache.hpp
     include/${PROJECT_NAME}/noDataCacheOptions.hpp
-    include/${PROJECT_NAME}/metricsSingleton.hpp
+    include/${PROJECT_NAME}/rateLimiter.hpp
     include/${PROJECT_NAME}/request.hpp)
 
 set(LIBRARY_SRC
@@ -109,6 +110,7 @@ set(LIBRARY_SRC
     src/metricsSingleton.cpp
     src/noDataCache.cpp
     src/noDataCacheOptions.cpp
+    src/rateLimiter.cpp
     src/request.cpp
     src/version.cpp)
 
@@ -193,6 +195,7 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
        testing/earthscopeClientOptions.cpp
        testing/earthscopeClient.cpp
        testing/noDataCache.cpp
+       testing/rateLimiter.cpp
        testing/request.cpp)
    add_executable(unitTests ${TEST_SRC})
    set_target_properties(unitTests PROPERTIES

@@ -24,8 +24,8 @@ struct HTTPResponse
     long status{0};          ///< HTTP status code
 };
 
-[[nodiscard]] size_t writeToBuffer(char *ptr, const size_t size,
-                                   const size_t nmemb, void *userp)
+[[nodiscard]] inline size_t writeToBuffer(char *ptr, const size_t size,
+                                          const size_t nmemb, void *userp)
 {
     auto *buffer = static_cast<std::string *> (userp);
     if (buffer == nullptr){return 0;}

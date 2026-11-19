@@ -70,13 +70,6 @@ public:
     /// @note By default this is 5 seconds.
     [[nodiscard]] std::chrono::milliseconds getConnectTimeOut() const noexcept;
 
-    /// @brief Sets the maximum number of requests per second.
-    /// @throws std::invalid_argument if maxRequestsPerSecond is not positive.
-    void setMaximumRequestsPerSecond(const int maxRequestPerSecond);
-    /// @result The maximum number of requests per second.
-    /// @note By default this is 500.
-    [[nodiscard]] int getMaximumRequestsPerSecond() const noexcept;
-
     /// @brief Creates the earthscope client options from an
     ///        initialization file.
     [[nodiscard]] static EarthscopeClientOptions 

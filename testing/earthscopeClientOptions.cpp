@@ -36,7 +36,6 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions",
         REQUIRE(options.getConnectTimeOut() == std::chrono::seconds {5});
         REQUIRE(options.getMaximumResponseSizeInBytes()
              == int64_t {32}*1024*1024);
-        REQUIRE(options.getMaximumRequestsPerSecond() == 500);
         REQUIRE_THROWS_AS(options.getAccessToken(), std::runtime_error);
         REQUIRE_THROWS_AS(options.getLegacyCredentials(), std::runtime_error);
     }
@@ -114,29 +113,14 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions",
                           std::invalid_argument);
     }
 
-    SECTION("Maximum requests per second")
-    {
-        options.setMaximumRequestsPerSecond(20);
-        REQUIRE(options.getMaximumRequestsPerSecond() == 20);
-        options.setMaximumRequestsPerSecond(1);
-        REQUIRE(options.getMaximumRequestsPerSecond() == 1);
-        REQUIRE_THROWS_AS(options.setMaximumRequestsPerSecond(0),
-                          std::invalid_argument);
-        REQUIRE_THROWS_AS(options.setMaximumRequestsPerSecond(-1),
-                          std::invalid_argument);
-        REQUIRE(options.getMaximumRequestsPerSecond() == 1);
-    }
-
     SECTION("Copy and move")
     {
         options.setAccessToken(TOKEN);
         options.setRequestTimeOut(std::chrono::seconds {3});
-        options.setMaximumRequestsPerSecond(20);
 
         EarthscopeClientOptions copy{options};
         REQUIRE(copy.getAccessToken() == TOKEN);
         REQUIRE(copy.getRequestTimeOut() == std::chrono::seconds {3});
-        REQUIRE(copy.getMaximumRequestsPerSecond() == 20);
 
         // The copy is deep
         copy.setRequestTimeOut(std::chrono::seconds {4});
@@ -232,7 +216,6 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
         REQUIRE(options.getConnectTimeOut() == std::chrono::seconds {5});
         REQUIRE(options.getMaximumResponseSizeInBytes()
              == int64_t {32}*1024*1024);
-        REQUIRE(options.getMaximumRequestsPerSecond() == 500);
     }
 
     SECTION("All settings")
@@ -244,11 +227,9 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
             "password = " + PASSWORD + "\n"
             "requestTimeOutInSeconds = 30\n"
             "connectTimeOutInSeconds = 2\n"
-            "maximumResponseSizeInMegabytes = 64\n"
-            "maximumRequestsPerSecond = 20\n");
+            "maximumResponseSizeInMegabytes = 64\n");
         const auto options
             = EarthscopeClientOptions::fromInitializationFile(ini);
-        REQUIRE(options.getMaximumRequestsPerSecond() == 20);
         REQUIRE(options.getEndpoint()
              == "http://localhost:8080/fdsnws/dataselect/1");
         REQUIRE(options.getRequestTimeOut() == std::chrono::seconds {30});
@@ -355,8 +336,8 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
     {
         auto setting = GENERATE(as<std::string> {},
                                 "requestTimeOutInSeconds = 0",
-                                "maximumRequestsPerSecond = 0",
-                                "maximumRequestsPerSecond = -5");
+                                "connectTimeOutInSeconds = 0",
+                                "maximumResponseSizeInMegabytes = 0");
         const auto ini = directory.write("test.ini",
             "[Earthscope]\n"
             "user = " + USER + "\n"

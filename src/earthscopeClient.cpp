@@ -1,4 +1,3 @@
-#include <cstddef>
 #include <exception>
 #include <expected>
 #include <memory>
@@ -24,7 +23,7 @@ public:
                          const CURLGlobal &curlGlobal,
                          std::shared_ptr<spdlog::logger> logger) :
         mOptions(options),
-        mCURLFactory(options, curlGlobal),
+        mCURLFactory(mOptions, curlGlobal),
         mLogger(std::move(logger))
     {
         if (!mOptions.hasAccessToken() &&

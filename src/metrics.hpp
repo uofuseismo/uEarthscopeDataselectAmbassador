@@ -42,6 +42,9 @@ opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     earthscopeRequestsCounter{nullptr};
 opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     earthscopeRetriesCounter{nullptr};
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    rateLimitedCounter{nullptr};
+
 
 
 
@@ -301,6 +304,35 @@ void observeEarthscopeBytesDownloaded(
     }
 }
 
+// Rate limited
+void observeRateLimitedRequestsCounts(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {   
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        // N.B. these should all be noexcepts
+        auto &instance
+            = UEarthscopeDataselectAmbassador::Metrics::
+                 MetricsSingleton::getInstance();
+        observer->Observe(instance.getRateLimitedRequestsCount());
+    }   
+}
+
+
 
 }
 
@@ -358,6 +390,16 @@ void createMeters(const ::ProgramOptions &options)
              ""); 
     serverSuccessCounter->AddCallback(::observeServerSuccessCounts, nullptr);
 
+    // Rate limited counts
+    rateLimitedCounter
+        = meter->CreateInt64ObservableCounter(
+             "seismic_data.earthscope.server.rate_limited_requests",
+             "Number of requests rejected by the rate limiter",
+             "{request}");
+    rateLimitedCounter->AddCallback(
+        ::observeRateLimitedRequestsCounts, nullptr);
+
+
     // Earthscope request counts
     earthscopeRequestsCounter
         = meter->CreateInt64ObservableCounter(
@@ -367,7 +409,7 @@ void createMeters(const ::ProgramOptions &options)
     earthscopeRequestsCounter->AddCallback(
         ::observeEarthscopeRequestCounts, nullptr);
 
-    // Earthscope retries coutns
+    // Earthscope retries counts
     earthscopeRequestsCounter
         = meter->CreateInt64ObservableCounter(
              "seismic_data.earthscope.client.retried_requests",
@@ -375,7 +417,6 @@ void createMeters(const ::ProgramOptions &options)
              "{request}"); 
     earthscopeRequestsCounter->AddCallback(
         ::observeEarthscopeRetriesCounts, nullptr);
-
 
     // Data download
     bytesDownloadedCounter
@@ -385,6 +426,8 @@ void createMeters(const ::ProgramOptions &options)
              "By");
     bytesDownloadedCounter->AddCallback(
         ::observeEarthscopeBytesDownloaded, nullptr); 
+
+
 /*
     // 200 counts from earthscope
     clientSuccessCounter

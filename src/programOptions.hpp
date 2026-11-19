@@ -17,6 +17,7 @@
 namespace
 {
 constexpr std::string_view APPLICATION_NAME{"uEarthscopeDataselectAmbassador"};
+constexpr int MAX_REQUESTS_PER_SECOND{50};
 
 struct CrowOptions
 {
@@ -197,6 +198,16 @@ struct ProgramOptions
             = NoDataCacheOptions::fromInitializationFile(
                  iniFile, "NoDataCache"); 
 
+        // Rate limit
+        maximumRequestsPerSecond
+            = propertyTree.get<int> ("RateLimiter.maximumRequestsPerSecond",
+                                     MAX_REQUESTS_PER_SECOND);
+        if (maximumRequestsPerSecond < 1)
+        {
+            throw std::invalid_argument(
+                "RateLimiter.maximumRequestsPerSecond must be positive");
+        }
+
         // Crow
         crowOptions
             = CrowOptions::parseInitializationFile(propertyTree, "Crow");
@@ -267,6 +278,7 @@ struct ProgramOptions
     std::string earthscopeUsername;
     std::string earthscopePassword;
     std::string earthscopeToken;
+    int maximumRequestsPerSecond{MAX_REQUESTS_PER_SECOND};
     int verbosity{3};
     bool documentAPI{false};
     bool exportLogs{false};

@@ -18,7 +18,6 @@ namespace
 constexpr int MAXIMUM_PAYLOAD_MB{32};
 constexpr int REQUEST_TIMEOUT_S{15};
 constexpr int CONNECT_TIMEOUT_S{5};
-constexpr int MAXIMUM_REQUESTS_PER_SECOND{500};
 }
 
 using namespace UEarthscopeDataselectAmbassador;
@@ -62,7 +61,6 @@ public:
     {
         std::chrono::seconds {CONNECT_TIMEOUT_S}
     };
-    int mMaximumRequestsPerSecond{MAXIMUM_REQUESTS_PER_SECOND};
     bool mHasUserNameAndPassword{false}; 
 };
 
@@ -226,23 +224,6 @@ std::string EarthscopeClientOptions::getEndpoint() const
     return pImpl->mEndpoint;
 }
 
-/// RPS
-void EarthscopeClientOptions::setMaximumRequestsPerSecond(
-    const int maxRequestsPerSecond)
-{
-    if (maxRequestsPerSecond < 1)
-    {
-        throw std::invalid_argument(
-            "Maximum requests per second must be positive");
-    }
-    pImpl->mMaximumRequestsPerSecond = maxRequestsPerSecond;
-}
-
-int EarthscopeClientOptions::getMaximumRequestsPerSecond() const noexcept
-{
-    return pImpl->mMaximumRequestsPerSecond;
-}
-
 /// Destructor
 EarthscopeClientOptions::~EarthscopeClientOptions() = default;
 
@@ -317,11 +298,6 @@ EarthscopeClientOptions::fromInitializationFile(
     maximumPayload = maximumPayload*(1024L*1024L);
     options.setMaximumResponseSizeInBytes(maximumPayload);
 
-    // RPS
-    options.setMaximumRequestsPerSecond(
-        propertyTree.get<int>
-        (section + "maximumRequestsPerSecond",
-        MAXIMUM_REQUESTS_PER_SECOND));
     return options;
 }   
 

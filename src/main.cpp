@@ -22,6 +22,7 @@
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
 #include "uEarthscopeDataselectAmbassador/metricsSingleton.hpp"
 #include "uEarthscopeDataselectAmbassador/noDataCache.hpp"
+#include "uEarthscopeDataselectAmbassador/rateLimiter.hpp"
 #include "uEarthscopeDataselectAmbassador/request.hpp"
 #include "uEarthscopeDataselectAmbassador/version.hpp"
 #include "parseCommandLineOptions.hpp"
@@ -291,6 +292,9 @@ int main(int argc, char *argv[])
                          curlGlobal,
                          logger};
 
+    // Request rate limiter
+    RateLimiter rateLimiter{programOptions.maximumRequestsPerSecond};
+
     // Limiter to back off on 204 errors and not crush our request quota
     std::unique_ptr<NoDataCache> noDataCache{nullptr};
     if (programOptions.noDataCacheOptions.getMaximumNumberOfEntries() > 0)
@@ -311,6 +315,7 @@ int main(int argc, char *argv[])
         .methods(crow::HTTPMethod::Get)
     ([&](const crow::request &httpRequest) -> crow::response
     {
+        auto &metrics = Metrics::MetricsSingleton::getInstance();
         const auto startClock = std::chrono::steady_clock::now();
         SPDLOG_LOGGER_DEBUG(logger, "GET query starting");
         const auto mark = httpRequest.raw_url.find('?');
@@ -351,6 +356,21 @@ int main(int argc, char *argv[])
                 SPDLOG_LOGGER_WARN(logger, "Failed to check cache because {}",
                                    e.what());
             }
+        }
+        if (rateLimiter.rateExceeded())
+        {
+            metrics.incrementRateLimitedRequests();
+            SPDLOG_LOGGER_DEBUG(logger,
+                                "Rate limited {}.{}.{}.{}",
+                                request->getNetwork().value_or("*"),
+                                request->getStation().value_or("*"),
+                                request->getLocationCode().value_or("*"),
+                                request->getChannel().value_or("*"));
+            auto response = ::toErrorResponse(503,
+                                              "Service Unavailable",
+                                              "Rate limit exceeded");
+            response.set_header("Retry-After", "1");
+            return response;
         }
         SPDLOG_LOGGER_DEBUG(
             logger,

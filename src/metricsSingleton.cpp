@@ -141,16 +141,28 @@ int64_t MetricsSingleton::getEarthscopeRetriesCount() const noexcept
     return mEarthscopeRetriesCounter.load(std::memory_order_relaxed);
 }
 
+/// Rate limits
+void MetricsSingleton::incrementRateLimitedRequests() noexcept
+{
+    mRateLimitedRequestsCounter.fetch_add(1, std::memory_order_relaxed);     
+}
+
+int64_t MetricsSingleton::getRateLimitedRequestsCount() const noexcept
+{
+    return mRateLimitedRequestsCounter.load(std::memory_order_relaxed);
+}
+
 
 /// Reset
 void MetricsSingleton::resetMetrics() noexcept
 {
+    const std::scoped_lock lock{mMutex};
     mClientUnauthorizedCounter.store(0);
     mClientUnauthenticatedCounter.store(0);
     mBytesDownloadedCounter.store(0);
     mEarthscopeRequestsCounter.store(0);
     mEarthscopeRetriesCounter.store(0);
-    const std::scoped_lock lock{mMutex}; 
+    mRateLimitedRequestsCounter.store(0);
     for (auto &counter : mServerErrorCounterMap)
     {
         counter.second = 0;
