@@ -1,16 +1,30 @@
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
+#include <stdexcept>
+#include <string>
 #include <utility>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ptree_fwd.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 #include "uEarthscopeDataselectAmbassador/noDataCacheOptions.hpp"
 
 using namespace UEarthscopeDataselectAmbassador;
 
+namespace
+{
+constexpr int DEFAULT_TTL_SECONDS{150};
+}
+
 class NoDataCacheOptions::NoDataCacheOptionsImpl
 {
 public:
-    std::chrono::milliseconds mTimeToLive{std::chrono::seconds {120}};
-    int mMaximumEntries{2048};     
+    std::chrono::milliseconds mTimeToLive
+    {
+        std::chrono::seconds {DEFAULT_TTL_SECONDS}
+    };
+    int mMaximumEntries{4096};
 };
 
 /// Constructor
@@ -64,6 +78,10 @@ int NoDataCacheOptions::getMaximumNumberOfEntries() const noexcept
 void NoDataCacheOptions::setTimeToLive(
     const std::chrono::milliseconds &duration)
 {
+    if (duration <= std::chrono::seconds {0})
+    {
+        throw std::invalid_argument("Cached requests TTL must be positive");
+    }
     pImpl->mTimeToLive = duration;
 }
 
@@ -74,3 +92,32 @@ std::chrono::milliseconds NoDataCacheOptions::getTimeToLive() const noexcept
 
 /// Destructor
 NoDataCacheOptions::~NoDataCacheOptions() = default;
+
+/// Create from options
+NoDataCacheOptions
+NoDataCacheOptions::fromInitializationFile(
+    const std::filesystem::path &iniFile,
+    const std::string &sectionIn)
+{
+    if (!std::filesystem::exists(iniFile))
+    {   
+        throw std::invalid_argument(
+           std::string {iniFile}.append(" does not exist"));
+    }   
+    boost::property_tree::ptree propertyTree;
+    boost::property_tree::ini_parser::read_ini(iniFile, propertyTree);
+
+    NoDataCacheOptions options;
+    auto section = sectionIn;
+    if (section.empty()){section = "NoDataCacheOptions";}
+    if (section.back() != '.'){section.append(".");}
+    options.setMaximumNumberOfEntries(
+         propertyTree.get<int> (section + "maximumEntries",
+                                options.getMaximumNumberOfEntries()));
+
+    auto timeToLiveSeconds
+        = propertyTree.get<int> (section + "timeToLiveInSeconds",
+                                 DEFAULT_TTL_SECONDS);
+    options.setTimeToLive(std::chrono::seconds {timeToLiveSeconds});
+    return options;
+}

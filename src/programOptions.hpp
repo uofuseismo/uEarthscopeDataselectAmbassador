@@ -11,6 +11,7 @@
 #include <crow/compression.h>
 #endif
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
+#include "uEarthscopeDataselectAmbassador/noDataCacheOptions.hpp"
 #include "otelOptions.hpp"
 
 namespace
@@ -191,6 +192,11 @@ struct ProgramOptions
             = EarthscopeClientOptions::fromInitializationFile(
                  iniFile, "Earthscope"); 
 
+        // No data cache
+        noDataCacheOptions
+            = NoDataCacheOptions::fromInitializationFile(
+                 iniFile, "NoDataCach"); 
+
         // Crow
         crowOptions
             = CrowOptions::parseInitializationFile(propertyTree, "Crow");
@@ -256,6 +262,8 @@ struct ProgramOptions
         otelGRPCLogOptions;
     UEarthscopeDataselectAmbassador::EarthscopeClientOptions
         earthscopeClientOptions;
+    UEarthscopeDataselectAmbassador::NoDataCacheOptions
+        noDataCacheOptions;
     std::string earthscopeUsername;
     std::string earthscopePassword;
     std::string earthscopeToken;

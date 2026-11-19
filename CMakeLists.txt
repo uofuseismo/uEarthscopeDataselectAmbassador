@@ -192,6 +192,7 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    set(TEST_SRC
        testing/earthscopeClientOptions.cpp
        testing/earthscopeClient.cpp
+       testing/noDataCache.cpp
        testing/request.cpp)
    add_executable(unitTests ${TEST_SRC})
    set_target_properties(unitTests PROPERTIES
