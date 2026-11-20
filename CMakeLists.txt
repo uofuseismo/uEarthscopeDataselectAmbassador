@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(uEarthscopeDataselectAmbassador VERSION 0.0.1 LANGUAGES CXX)
+project(uEarthscopeDataselectAmbassador VERSION 0.1.0 LANGUAGES CXX)
 enable_testing()
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
@@ -194,6 +194,7 @@ endif()
 if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    include(Catch)
    set(TEST_SRC
+       testing/bulkRequest.cpp
        testing/earthscopeClientOptions.cpp
        testing/earthscopeClient.cpp
        testing/noDataCache.cpp

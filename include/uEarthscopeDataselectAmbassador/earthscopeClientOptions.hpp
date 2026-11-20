@@ -56,12 +56,19 @@ public:
     ///         is appropriate for the small requests in operations settings.
     [[nodiscard]] int64_t getMaximumResponseSizeInBytes() const noexcept;
 
-    /// @brief Sets the request timeout.
+    /// @brief Sets the GET request timeout.
     /// @throws std::invalid_argument if the timeout is not positive.
-    void setRequestTimeOut(const std::chrono::milliseconds &timeOut);
-    /// @result The cURL request timeout.  
+    void setGetRequestTimeOut(const std::chrono::milliseconds &timeOut);
+    /// @result The cURL GET request timeout.  
     /// @note By default this is 15 seconds.
-    [[nodiscard]] std::chrono::milliseconds getRequestTimeOut() const noexcept;
+    [[nodiscard]] std::chrono::milliseconds getGetRequestTimeOut() const noexcept;
+
+    /// @brief Sets the POST request timeout.
+    /// @throws std::invalid_argument if the timeout is not positive.
+    void setPostRequestTimeOut(const std::chrono::milliseconds &timeOut);
+    /// @result The cURL POST request timeout.  
+    /// @note By default this is 120 seconds.
+    [[nodiscard]] std::chrono::milliseconds getPostRequestTimeOut() const noexcept;
 
     /// @brief Sets the connect timeout.
     /// @throws std::invalid_argument if the timeout is not positive.

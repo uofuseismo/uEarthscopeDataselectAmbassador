@@ -1,11 +1,14 @@
 #ifndef TESTING_FAKE_SERVER_HPP
 #define TESTING_FAKE_SERVER_HPP
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cstdint>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -18,14 +21,24 @@ namespace Testing
 
 /// A loopback HTTP server that mimics EarthScope's origin stalls: it accepts
 /// a connection and never sends a byte.  In StallThenRespond mode the first
-/// connection stalls and later ones get a small 200.
+/// connection stalls and later ones get a small 200.  In Respond mode every
+/// connection gets a small 200.  The last answered request is recorded.
 class FakeServer
 {
 public:
     enum class Mode
     {
         Stall,
-        StallThenRespond
+        StallThenRespond,
+        Respond
+    };
+
+    struct RecordedRequest
+    {
+        std::string method;
+        std::string target;
+        std::string contentType;
+        std::string body;
     };
 
     explicit FakeServer(const Mode mode) :
@@ -79,6 +92,12 @@ public:
         return mConnections.load();
     }
 
+    [[nodiscard]] RecordedRequest lastRequest() const
+    {
+        const std::scoped_lock lock{mMutex};
+        return mLastRequest;
+    }
+
     static constexpr const char *PAYLOAD{"abcd"};
 private:
     void serve(const std::stop_token &token)
@@ -90,7 +109,8 @@ private:
             const int client = ::accept(mSocket, nullptr, nullptr);
             if (client < 0){continue;}
             const auto count = ++mConnections;
-            if (mMode == Mode::StallThenRespond && count > 1)
+            if (mMode == Mode::Respond ||
+                (mMode == Mode::StallThenRespond && count > 1))
             {
                 respond(client);
                 ::close(client);
@@ -101,7 +121,29 @@ private:
         }
     }
 
-    static void respond(const int client)
+    [[nodiscard]] static std::string toLower(std::string text)
+    {
+        std::ranges::transform(text, text.begin(), [](const unsigned char c)
+        {
+            return static_cast<char> (std::tolower(c));
+        });
+        return text;
+    }
+
+    [[nodiscard]] static std::string headerValue(const std::string &headers,
+                                                 const std::string &name)
+    {
+        const auto lower = toLower(headers);
+        const auto key = "\r\n" + toLower(name) + ":";
+        const auto start = lower.find(key);
+        if (start == std::string::npos){return {};}
+        auto first = start + key.size();
+        const auto last = headers.find("\r\n", first);
+        while (first < last && headers[first] == ' '){++first;}
+        return headers.substr(first, last - first);
+    }
+
+    void respond(const int client)
     {
         std::string request;
         std::vector<char> buffer(4096);
@@ -110,6 +152,29 @@ private:
             const auto received = ::recv(client, buffer.data(), buffer.size(), 0);
             if (received <= 0){return;}
             request.append(buffer.data(), static_cast<size_t> (received));
+        }
+        const auto headerEnd = request.find("\r\n\r\n") + 4;
+        const auto headers = request.substr(0, headerEnd);
+        const auto contentLength = headerValue(headers, "Content-Length");
+        const size_t bodyLength
+            = contentLength.empty() ? 0 : std::stoul(contentLength);
+        while (request.size() < headerEnd + bodyLength)
+        {
+            const auto received = ::recv(client, buffer.data(), buffer.size(), 0);
+            if (received <= 0){return;}
+            request.append(buffer.data(), static_cast<size_t> (received));
+        }
+        RecordedRequest recorded;
+        const auto firstSpace = headers.find(' ');
+        const auto secondSpace = headers.find(' ', firstSpace + 1);
+        recorded.method = headers.substr(0, firstSpace);
+        recorded.target
+            = headers.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+        recorded.contentType = headerValue(headers, "Content-Type");
+        recorded.body = request.substr(headerEnd, bodyLength);
+        {
+            const std::scoped_lock lock{mMutex};
+            mLastRequest = std::move(recorded);
         }
         const std::string response{
             "HTTP/1.1 200 OK\r\n"
@@ -123,6 +188,7 @@ private:
     std::jthread mThread;
     mutable std::mutex mMutex;
     std::vector<int> mClients;
+    RecordedRequest mLastRequest;
     std::atomic<int> mConnections{0};
     Mode mMode;
     int mSocket{-1};

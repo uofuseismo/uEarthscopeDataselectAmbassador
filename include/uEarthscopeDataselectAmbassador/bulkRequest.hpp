@@ -39,6 +39,10 @@ public:
     [[nodiscard]] bool noDataIs404() const noexcept;
     /// @result The bulk request to submit to Earthscope. 
     [[nodiscard]] std::string toString() const;
+    /// @result True indicates that there are no requests. 
+    [[nodiscard]] bool empty() const noexcept;
+    /// @result The number of requests.
+    [[nodiscard]] int size() const noexcept;
 
     /// @brief Destructor.
     ~BulkRequest();

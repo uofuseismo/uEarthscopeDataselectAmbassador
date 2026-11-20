@@ -5,6 +5,7 @@
 #include <spdlog/logger.h>
 namespace UEarthscopeDataselectAmbassador
 {
+ class BulkRequest;
  class CURLGlobal;
  class EarthscopeClientOptions;
  class Request;
@@ -53,6 +54,8 @@ public:
 
     /// @brief Performs a GET request to the Earthscope FDSNWS.
     [[nodiscard]] auto get(const Request &request) const -> std::expected<Response, Error>;
+    /// @brief Performs a POST request to the Earthscope FDSNWS.
+    [[nodiscard]] auto post(const BulkRequest &request) const -> std::expected<Response, Error>;
 
     /// @brief Destructor
     ~EarthscopeClient();

@@ -16,7 +16,8 @@
 namespace
 {
 constexpr int MAXIMUM_PAYLOAD_MB{32};
-constexpr int REQUEST_TIMEOUT_S{15};
+constexpr int GET_REQUEST_TIMEOUT_S{15};
+constexpr int POST_REQUEST_TIMEOUT_S{120};
 constexpr int CONNECT_TIMEOUT_S{5};
 }
 
@@ -53,10 +54,14 @@ public:
     {
         MAXIMUM_PAYLOAD_MB*1024L*1024L
     };
-    std::chrono::milliseconds mRequestTimeOut
+    std::chrono::milliseconds mGetRequestTimeOut
     {
-        std::chrono::seconds {REQUEST_TIMEOUT_S}
+        std::chrono::seconds {GET_REQUEST_TIMEOUT_S}
     };
+    std::chrono::milliseconds mPostRequestTimeOut
+    {   
+        std::chrono::seconds {POST_REQUEST_TIMEOUT_S}
+    };  
     std::chrono::milliseconds mConnectTimeOut
     {
         std::chrono::seconds {CONNECT_TIMEOUT_S}
@@ -174,22 +179,39 @@ int64_t EarthscopeClientOptions::getMaximumResponseSizeInBytes()
     return pImpl->mMaximumPayloadInBytes;
 }
 
-/// Request time out
-void EarthscopeClientOptions::setRequestTimeOut(
+/// Get request time out
+void EarthscopeClientOptions::setGetRequestTimeOut(
     const std::chrono::milliseconds &timeOut)
 {
     if (timeOut <= std::chrono::milliseconds {0})
     {
-        throw std::invalid_argument("Time out must be positive");
+        throw std::invalid_argument("Get time out must be positive");
     }
-    pImpl->mRequestTimeOut = timeOut;
+    pImpl->mGetRequestTimeOut = timeOut;
 }
 
 std::chrono::milliseconds 
-EarthscopeClientOptions::getRequestTimeOut() const noexcept
+EarthscopeClientOptions::getGetRequestTimeOut() const noexcept
 {
-    return pImpl->mRequestTimeOut;
+    return pImpl->mGetRequestTimeOut;
 }
+
+/// Post request time out
+void EarthscopeClientOptions::setPostRequestTimeOut(
+    const std::chrono::milliseconds &timeOut)
+{
+    if (timeOut <= std::chrono::milliseconds {0})
+    {
+        throw std::invalid_argument("Post time out must be positive");
+    }
+    pImpl->mPostRequestTimeOut = timeOut;
+}
+    
+std::chrono::milliseconds
+EarthscopeClientOptions::getPostRequestTimeOut() const noexcept
+{
+    return pImpl->mPostRequestTimeOut;
+}   
 
 /// Connect time out
 void EarthscopeClientOptions::setConnectTimeOut(
@@ -280,9 +302,16 @@ EarthscopeClientOptions::fromInitializationFile(
     // Timeouts
     auto requestTimeOut
         = propertyTree.get<int> 
-          (section + "requestTimeOutInSeconds",
-           REQUEST_TIMEOUT_S);
-    options.setRequestTimeOut(std::chrono::seconds {requestTimeOut}); 
+          (section + "getRequestTimeOutInSeconds",
+           GET_REQUEST_TIMEOUT_S);
+    options.setGetRequestTimeOut(std::chrono::seconds {requestTimeOut}); 
+
+    requestTimeOut
+        = propertyTree.get<int> 
+          (section + "postRequestTimeOutInSeconds",
+           POST_REQUEST_TIMEOUT_S);
+    options.setPostRequestTimeOut(std::chrono::seconds {requestTimeOut});
+
 
     auto connectTimeOut
         = propertyTree.get<int> 

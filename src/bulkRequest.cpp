@@ -73,12 +73,15 @@ BulkRequest::BulkRequest(const std::string &body)
         if (const auto equals = line.find('='); equals != std::string::npos)
         {
             auto key = boost::algorithm::trim_copy(line.substr(0, equals));
+            auto value = boost::algorithm::trim_copy(line.substr(equals + 1));
             if (::isRetired(key)){continue;}
             if (!boost::iequals(key, "format") && !boost::iequals(key, "nodata"))
             {
                 throw std::invalid_argument("Unsupported POST option");
             }
-            options.append("&" + line);
+            //options.append("&" + line);
+            //options.append("&" + key + "=" + value);
+            options.append("&").append(key).append("=").append(value);
             continue;
         }
         std::istringstream fields{line};
@@ -185,6 +188,16 @@ Request::DataFormat BulkRequest::getDataFormat() const noexcept
 bool BulkRequest::noDataIs404() const noexcept
 {
     return pImpl->mNoDataIs404;
+}
+
+bool BulkRequest::empty() const noexcept
+{
+    return pImpl->mRequests.empty();
+}
+
+int BulkRequest::size() const noexcept
+{
+    return static_cast<int> (pImpl->mRequests.size());
 }
 
 /// To string

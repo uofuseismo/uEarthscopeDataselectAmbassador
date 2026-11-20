@@ -16,6 +16,7 @@
 #include <crow/http_request.h>
 #include <crow/http_response.h>
 #include <crow/logging.h>
+#include "uEarthscopeDataselectAmbassador/bulkRequest.hpp"
 #include "uEarthscopeDataselectAmbassador/curlGlobal.hpp"
 #include "uEarthscopeDataselectAmbassador/earthscopeClient.hpp"
 //NOLINTNEXTLINE(misc-include-cleaner)
@@ -148,7 +149,7 @@ class CustomLogger : public crow::ILogHandler
 {
 public:
     CustomLogger()
-    {   
+    {
         ::ProgramOptions programOptions;
         programOptions.exportLogs = false;
         programOptions.verbosity = 3;
@@ -160,7 +161,7 @@ public:
             throw std::runtime_error(
                 "Failed to initialize crow console logger");
         }
-    }   
+    }
     explicit CustomLogger(std::shared_ptr<spdlog::logger> existingLogger) :
         logger(std::move(existingLogger))
     {   
@@ -197,13 +198,13 @@ public:
         {
             logger->warn(message);
         }
-        else if (level == crow::LogLevel::Critical)
-        {
-            logger->critical(message);
-        }
         else if (level == crow::LogLevel::Error)
         {
             logger->error(message);
+        }
+        else if (level == crow::LogLevel::Critical)
+        {
+            logger->critical(message);
         }
         else if (level == crow::LogLevel::Debug)
         {
@@ -343,9 +344,9 @@ int main(int argc, char *argv[])
         std::string cacheKey;
         if (noDataCache != nullptr)
         {
-            cacheKey = request->toString();
             try
             {
+                cacheKey = request->toString();
                 if (noDataCache->contains(cacheKey))
                 {
                     metrics.increment204CacheHitCounter();
@@ -430,11 +431,154 @@ int main(int argc, char *argv[])
         {
             SPDLOG_LOGGER_WARN(
                 logger,
-                "Request for {}.{}.{}.{} failed",
+                "GET request for {}.{}.{}.{} failed",
                 request->getNetwork().value_or("*"),
                 request->getStation().value_or("*"),
                 request->getLocationCode().value_or("*"),
                 request->getChannel().value_or("*"));
+        }
+        return response;
+    });
+    CROW_ROUTE(app, "/fdsnws/dataselect/1/query")
+        .methods(crow::HTTPMethod::Post)
+    ([&](const crow::request &httpRequest) -> crow::response
+    {   
+        auto &metrics = Metrics::MetricsSingleton::getInstance();
+        const auto startClock = std::chrono::steady_clock::now();
+        SPDLOG_LOGGER_DEBUG(logger, "POST query starting");
+
+        std::optional<BulkRequest> bulkRequest;
+        try
+        {
+            bulkRequest.emplace(httpRequest.body);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            SPDLOG_LOGGER_DEBUG(logger, "Rejected query: {}", e.what());
+            return ::toErrorResponse(400, "Bad Request", e.what());
+        }
+        catch (const std::exception &e)
+        {
+            SPDLOG_LOGGER_ERROR(logger,
+                                "Failed to parse POST body: {}",
+                                e.what());
+           return ::toErrorResponse(500,
+                                    "Internal Server Error",
+                                    "Internal error");
+        }
+        // Is every request in the 204 cache?
+        if (noDataCache != nullptr)
+        {
+            bool allIn204Cache{true};
+            for (const auto &request : *bulkRequest) 
+            {
+                try
+                {
+                    auto cacheKey = request.toString();
+                    if (!noDataCache->contains(cacheKey))
+                    {
+                        allIn204Cache = false;
+                        break;
+                    }
+                }
+                catch (const std::exception &e)
+                {
+                    SPDLOG_LOGGER_WARN(logger,
+                                        "Failed to check cache because {}",
+                                        e.what());
+                    // At this stage we don't know if this in the cache
+                    // so give up and push forward
+                    allIn204Cache = false;
+                    break;
+                }
+            }
+            if (allIn204Cache)
+            {
+                metrics.increment204CacheHitCounter();
+                SPDLOG_LOGGER_DEBUG(logger, "204 cache hit for POST request");
+                return crow::response{204};
+            }
+        }
+        // Rate limit?
+        if (rateLimiter.rateExceeded())
+        {
+            metrics.incrementRateLimitedRequests();
+            SPDLOG_LOGGER_DEBUG(logger,
+                                "Rate limited POST request");
+            auto response = ::toErrorResponse(503,
+                                              "Service Unavailable",
+                                              "Rate limit exceeded");
+            response.set_header("Retry-After", "1");
+            return response;
+        }
+        // POST
+        auto response
+            = ::toCrowResponse(earthscopeClient.post(*bulkRequest), *logger);
+        const auto &first = *bulkRequest->begin();
+        if (response.code == 200)
+        {
+            SPDLOG_LOGGER_INFO(
+                logger,
+                "POST {} selections (first {}.{}.{}.{}) -> {} ({} bytes, {} ms)",
+                bulkRequest->size(),
+                first.getNetwork().value_or("*"),
+                first.getStation().value_or("*"),
+                first.getLocationCode().value_or("*"),
+                first.getChannel().value_or("*"),
+                response.code,
+                response.body.size(),
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - startClock).count());
+        }
+        else if (response.code == 204)
+        {
+            if (noDataCache != nullptr && !bulkRequest->noDataIs404())
+            {   
+                try
+                {
+                    // Hopefully we don't blow out the cache
+                    for (const auto &request : *bulkRequest)
+                    {
+                        noDataCache->insert(request.toString());
+                    }
+                }   
+                catch (const std::exception &e) 
+                {   
+                    SPDLOG_LOGGER_WARN(logger,
+                                       "Failed to update cache because {}",
+                                       e.what() );
+                }
+            }
+            int code = bulkRequest->noDataIs404() ? 404 : 204; 
+            SPDLOG_LOGGER_INFO(
+                logger,
+                "POST {} selections generated no data (first {}.{}.{}.{}) -> {} ({} ms)",
+                bulkRequest->size(),
+                first.getNetwork().value_or("*"),
+                first.getStation().value_or("*"),
+                first.getLocationCode().value_or("*"),
+                first.getChannel().value_or("*"),
+                code,
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - startClock).count());
+             if (bulkRequest->noDataIs404())
+             {
+                 return ::toErrorResponse(404, "Not Found", "No data available");
+             }
+        }
+        else
+        {
+            SPDLOG_LOGGER_WARN(
+                logger,
+                "POST {} selections (first {}.{}.{}.{}) -> {} ({} ms) failed",
+                bulkRequest->size(),
+                first.getNetwork().value_or("*"),
+                first.getStation().value_or("*"),
+                first.getLocationCode().value_or("*"),
+                first.getChannel().value_or("*"),
+                response.code,
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - startClock).count());
         }
         return response;
     });
@@ -445,7 +589,22 @@ int main(int argc, char *argv[])
                            "Starting Crow on {}:{}",
                            programOptions.crowOptions.bindAddress,
                            programOptions.crowOptions.port);
-        app.loglevel(crow::LogLevel::Warning);
+        if (programOptions.crowOptions.verbosity <= 1)
+        {
+            app.loglevel(crow::LogLevel::Critical);
+        }
+        else if (programOptions.crowOptions.verbosity == 2)
+        {
+            app.loglevel(crow::LogLevel::Warning);
+        }
+        else if (programOptions.crowOptions.verbosity == 3)
+        {
+            app.loglevel(crow::LogLevel::Info);
+        }
+        else
+        {
+            app.loglevel(crow::LogLevel::Debug);
+        }
         app.bindaddr(programOptions.crowOptions.bindAddress)
            .port(programOptions.crowOptions.port)
            .server_name(programOptions.crowOptions.serverName);

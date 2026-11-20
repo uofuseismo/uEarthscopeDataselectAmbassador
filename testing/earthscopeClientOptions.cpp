@@ -32,7 +32,8 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions",
              == "https://service.earthscope.org/fdsnws/dataselect/1");
         REQUIRE_FALSE(options.hasAccessToken());
         REQUIRE_FALSE(options.hasLegacyCredentials());
-        REQUIRE(options.getRequestTimeOut() == std::chrono::seconds {15});
+        REQUIRE(options.getGetRequestTimeOut() == std::chrono::seconds {15});
+        REQUIRE(options.getPostRequestTimeOut() == std::chrono::seconds {120});
         REQUIRE(options.getConnectTimeOut() == std::chrono::seconds {5});
         REQUIRE(options.getMaximumResponseSizeInBytes()
              == int64_t {32}*1024*1024);
@@ -92,11 +93,15 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions",
     SECTION("Timeouts")
     {
         // Sub-second values must survive; curl's _MS options need them
-        options.setRequestTimeOut(std::chrono::milliseconds {750});
+        options.setGetRequestTimeOut(std::chrono::milliseconds {750});
+        options.setPostRequestTimeOut(std::chrono::milliseconds {1500});
         options.setConnectTimeOut(std::chrono::milliseconds {250});
-        REQUIRE(options.getRequestTimeOut() == std::chrono::milliseconds {750});
+        REQUIRE(options.getGetRequestTimeOut() == std::chrono::milliseconds {750});
+        REQUIRE(options.getPostRequestTimeOut() == std::chrono::milliseconds {1500});
         REQUIRE(options.getConnectTimeOut() == std::chrono::milliseconds {250});
-        REQUIRE_THROWS_AS(options.setRequestTimeOut(std::chrono::milliseconds {0}),
+        REQUIRE_THROWS_AS(options.setGetRequestTimeOut(std::chrono::milliseconds {0}),
+                          std::invalid_argument);
+        REQUIRE_THROWS_AS(options.setPostRequestTimeOut(std::chrono::milliseconds {0}),
                           std::invalid_argument);
         REQUIRE_THROWS_AS(options.setConnectTimeOut(std::chrono::milliseconds {-1}),
                           std::invalid_argument);
@@ -116,23 +121,26 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions",
     SECTION("Copy and move")
     {
         options.setAccessToken(TOKEN);
-        options.setRequestTimeOut(std::chrono::seconds {3});
+        options.setGetRequestTimeOut(std::chrono::seconds {3});
+        options.setPostRequestTimeOut(std::chrono::seconds {30});
 
         EarthscopeClientOptions copy{options};
         REQUIRE(copy.getAccessToken() == TOKEN);
-        REQUIRE(copy.getRequestTimeOut() == std::chrono::seconds {3});
+        REQUIRE(copy.getGetRequestTimeOut() == std::chrono::seconds {3});
+        REQUIRE(copy.getPostRequestTimeOut() == std::chrono::seconds {30});
 
         // The copy is deep
-        copy.setRequestTimeOut(std::chrono::seconds {4});
-        REQUIRE(options.getRequestTimeOut() == std::chrono::seconds {3});
+        copy.setGetRequestTimeOut(std::chrono::seconds {4});
+        REQUIRE(options.getGetRequestTimeOut() == std::chrono::seconds {3});
 
         EarthscopeClientOptions assigned;
         assigned = copy;
-        REQUIRE(assigned.getRequestTimeOut() == std::chrono::seconds {4});
+        REQUIRE(assigned.getGetRequestTimeOut() == std::chrono::seconds {4});
 
         const EarthscopeClientOptions moved{std::move(copy)};
         REQUIRE(moved.getAccessToken() == TOKEN);
-        REQUIRE(moved.getRequestTimeOut() == std::chrono::seconds {4});
+        REQUIRE(moved.getGetRequestTimeOut() == std::chrono::seconds {4});
+        REQUIRE(moved.getPostRequestTimeOut() == std::chrono::seconds {30});
     }
 }
 
@@ -212,7 +220,8 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
              == std::pair {USER, PASSWORD});
         REQUIRE(options.getEndpoint()
              == "https://service.earthscope.org/fdsnws/dataselect/1");
-        REQUIRE(options.getRequestTimeOut() == std::chrono::seconds {15});
+        REQUIRE(options.getGetRequestTimeOut() == std::chrono::seconds {15});
+        REQUIRE(options.getPostRequestTimeOut() == std::chrono::seconds {120});
         REQUIRE(options.getConnectTimeOut() == std::chrono::seconds {5});
         REQUIRE(options.getMaximumResponseSizeInBytes()
              == int64_t {32}*1024*1024);
@@ -225,14 +234,16 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
             "endpoint = http://localhost:8080/fdsnws/dataselect/1\n"
             "user = " + USER + "\n"
             "password = " + PASSWORD + "\n"
-            "requestTimeOutInSeconds = 30\n"
+            "getRequestTimeOutInSeconds = 30\n"
+            "postRequestTimeOutInSeconds = 90\n"
             "connectTimeOutInSeconds = 2\n"
             "maximumResponseSizeInMegabytes = 64\n");
         const auto options
             = EarthscopeClientOptions::fromInitializationFile(ini);
         REQUIRE(options.getEndpoint()
              == "http://localhost:8080/fdsnws/dataselect/1");
-        REQUIRE(options.getRequestTimeOut() == std::chrono::seconds {30});
+        REQUIRE(options.getGetRequestTimeOut() == std::chrono::seconds {30});
+        REQUIRE(options.getPostRequestTimeOut() == std::chrono::seconds {90});
         REQUIRE(options.getConnectTimeOut() == std::chrono::seconds {2});
         REQUIRE(options.getMaximumResponseSizeInBytes()
              == int64_t {64}*1024*1024);
@@ -335,7 +346,8 @@ TEST_CASE("UEarthscopeDataselectAmbassador::EarthscopeClientOptions - "
     SECTION("Non-positive settings are rejected")
     {
         auto setting = GENERATE(as<std::string> {},
-                                "requestTimeOutInSeconds = 0",
+                                "getRequestTimeOutInSeconds = 0",
+                                "postRequestTimeOutInSeconds = 0",
                                 "connectTimeOutInSeconds = 0",
                                 "maximumResponseSizeInMegabytes = 0");
         const auto ini = directory.write("test.ini",

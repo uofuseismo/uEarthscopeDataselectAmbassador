@@ -58,6 +58,10 @@ struct CrowOptions
             throw std::invalid_argument("Crow number of threads not positive");
         }
 
+        options.verbosity
+            = propertyTree.get<int> (section + "verbosity", options.verbosity);
+
+
 /*
 #ifdef CROW_ENABLE_COMPRESSION
         auto compressionType
@@ -150,6 +154,7 @@ struct CrowOptions
     std::string bindAddress{"127.0.0.1"};
     std::string serverName{"uearthscope-dataselect-ambassador-server"};
     int nThreads{1};
+    int verbosity{2};
     uint16_t port{8080};
 #ifdef CROW_ENABLE_COMPRESSION
     crow::compression::algorithm
