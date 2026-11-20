@@ -39,6 +39,7 @@ public:
     enum class Error
     {
         InvalidURL,        // Provided URL is empty
+        EmptyPOSTBody,     // The POST body is empty
         InvalidCURLOption, // Error setting an option in cURL.
         Uninitialized,     // Class not initialized
         TimedOut,          // CURLE_OPERATION_TIMEDOUT
@@ -114,12 +115,136 @@ public:
             default:
                 return CURLHandle::Error::Other;   // WRITE_ERROR, OUT_OF_MEMORY, ...
         }
-    }       
+    }
+
+    [[nodiscard]] 
+    std::expected<HTTPResponse, Error> 
+    perform(const std::string &url,
+            const std::optional<std::string> &postBody,
+            spdlog::logger *logger)
+    {
+        if (url.empty())
+        {
+            return std::unexpected(Error::InvalidURL);
+        }
+        if (mCurl == nullptr)
+        {
+            return std::unexpected(Error::Uninitialized);
+        }
+
+        if (postBody == std::nullopt)
+        {
+            try
+            {
+                setOption(CURLOPT_HTTPGET, 1L, "Failed to set GET");
+            }
+            catch (const std::exception &e)
+            {
+                if (logger)
+                {
+                    SPDLOG_LOGGER_ERROR(logger, "Failed to set GET"); 
+                }
+                return std::unexpected(Error::InvalidCURLOption);
+            }
+        }
+        else
+        {
+            if (postBody->empty())
+            {
+                return std::unexpected(Error::EmptyPOSTBody);
+            }
+            try
+            {
+                setOption(CURLOPT_POSTFIELDSIZE_LARGE,
+                          static_cast<curl_off_t> (postBody->size()),
+                          "Failed to set POST size");
+                setOption(CURLOPT_POSTFIELDS, postBody->c_str(),
+                          "Failed to set POST fields");
+
+            }
+            catch (const std::exception &e)
+            {
+                if (logger)
+                {
+                    SPDLOG_LOGGER_ERROR(logger, "Failed to set POST"); 
+                }
+                return std::unexpected(Error::InvalidCURLOption);
+            }
+        }
+
+        std::string buffer;
+        std::array<char, CURL_ERROR_SIZE> errorBuffer{};
+        try
+        {
+            setOption(CURLOPT_URL, url.c_str(), "Failed to set URL");
+            setOption(CURLOPT_WRITEDATA, &buffer, "Failed to set write buffer");
+            setOption(CURLOPT_ERRORBUFFER, errorBuffer.data(),
+                      "Failed to set error buffer");
+        }
+        catch (const std::exception &e)
+        {
+            if (logger)
+            {
+                SPDLOG_LOGGER_ERROR(logger, "Failed to option {}",
+                                    e.what());
+            }
+            return std::unexpected(Error::InvalidCURLOption);
+        }
+
+        const auto code = curl_easy_perform(mCurl.get());
+
+        // Don't leave the handle pointing at stack memory
+        curl_easy_setopt(mCurl.get(), CURLOPT_WRITEDATA, nullptr);
+        curl_easy_setopt(mCurl.get(), CURLOPT_ERRORBUFFER, nullptr);
+
+        if (code != CURLE_OK)
+        {
+            const auto error = CURLHandle::classifyCURLError(code);
+            if (logger != nullptr)
+            {
+                std::string details{errorBuffer.data()};
+                if (details.empty()){details = curl_easy_strerror(code);}
+                if (error == Error::TLSFailed)
+                {
+                    SPDLOG_LOGGER_CRITICAL(logger, "TLS failure: {}", details);
+                }
+                else
+                {
+                    SPDLOG_LOGGER_WARN(logger, "Request failed: {}", details);
+                }
+            }
+            return std::unexpected(error);
+        }
+
+        HTTPResponse response;
+        if (curl_easy_getinfo(mCurl.get(),
+                              CURLINFO_RESPONSE_CODE,
+                              &response.status) != CURLE_OK)
+        {
+            if (logger)
+            {
+                SPDLOG_LOGGER_ERROR(logger, "Failed to get response code");
+            }
+            return std::unexpected(Error::Other);
+        }
+        // Owned by the handle; may be null (e.g., 204)
+        const char *contentType{nullptr};
+        if (curl_easy_getinfo(mCurl.get(), CURLINFO_CONTENT_TYPE, &contentType)
+            == CURLE_OK && contentType != nullptr)
+        {
+            response.contentType = contentType;
+        }
+        response.body = std::move(buffer);
+        return response;
+    }
+
+
 
     [[nodiscard]] 
     std::expected<HTTPResponse, Error> get(const std::string &url,
                                            spdlog::logger *logger)
     {
+        return perform(url, std::nullopt, logger);
         if (url.empty())
         {
             return std::unexpected(Error::InvalidURL);
@@ -195,7 +320,14 @@ public:
         }
         response.body = std::move(buffer);
         return response;
+    }
 
+    [[nodiscard]] 
+    std::expected<HTTPResponse, Error> post(const std::string &url,
+                                            const std::string &postBody,
+                                            spdlog::logger *logger)
+    {
+        return perform(url, std::make_optional<std::string> (postBody), logger);
     }
 
     void setRequestTimeOut(const std::chrono::milliseconds &timeOut)
@@ -281,12 +413,12 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<CURLHandle>
-        create(const EarthscopeClientOptions &options,
-               const bool useToken) const
+        createGetHandle(const EarthscopeClientOptions &options,
+                        const bool useToken) const
     {
         auto handle = std::make_unique<CURLHandle>(CURLHandle::Key{});
         handle->setConnectTimeOut(options.getConnectTimeOut());
-        handle->setRequestTimeOut(options.getRequestTimeOut());
+        handle->setRequestTimeOut(options.getGetRequestTimeOut());
         handle->setMaximumResponseSizeInBytes(
             options.getMaximumResponseSizeInBytes());
         // While developing it was observed about one in 7'ish requests
@@ -306,6 +438,31 @@ public:
         }
         return handle;
     }
+
+    [[nodiscard]] std::unique_ptr<CURLHandle>
+        createPostHandle(const EarthscopeClientOptions &options,
+                         const bool useToken) const
+    {
+        auto handle = std::make_unique<CURLHandle>(CURLHandle::Key{});
+        handle->setConnectTimeOut(options.getConnectTimeOut());
+        handle->setRequestTimeOut(options.getPostRequestTimeOut());
+        handle->setMaximumResponseSizeInBytes(
+            options.getMaximumResponseSizeInBytes());
+        constexpr int lowSpeedLimit{1};
+        constexpr int lowSpeedTime{5};
+        handle->setLowSpeedLimit(lowSpeedLimit);
+        handle->setLowSpeedTime(lowSpeedTime);
+        if (!useToken)
+        {
+            handle->setDigestAuth(options.getLegacyCredentials());
+        }
+        else
+        {
+            handle->setBearerAuth(options.getAccessToken());
+        }
+        return handle;
+    }   
+
  
 //private:
     EarthscopeClientOptions mOptions;
