@@ -17,76 +17,12 @@
 #include <boost/url/parse_query.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include "uEarthscopeDataselectAmbassador/request.hpp"
+#include "formatUtilities.hpp"
 
 using namespace UEarthscopeDataselectAmbassador;
 
 namespace
 {
-
-[[nodiscard]] std::string toISO8601(const std::chrono::microseconds &microseconds)
-{
-    const std::chrono::sys_time<std::chrono::microseconds> time{microseconds};
-    return std::format("{:%FT%T}", time);
-}
-
-[[nodiscard]] std::string toString(const Request::DataFormat format)
-{
-    if (format == Request::DataFormat::MiniSEED)
-    {
-        return "format=miniseed";
-    }
-    else if (format == Request::DataFormat::GeoCSV)
-    {
-        return "format=geocsv";
-    }
-    else if (format == Request::DataFormat::GeoCSV_INLINE)
-    {
-        return "format=geocsv.inline";
-    }
-    else if (format == Request::DataFormat::GeoCSV_ZIP)
-    {   
-        return "format=geocsv.zip";
-    }
-    else if (format == Request::DataFormat::GeoCSV_TSPAIR)
-    {
-        return "format=geocsv.tspair";
-    }
-    else if (format == Request::DataFormat::GeoCSV_SLIST)
-    {
-        return "format=geocsv.slist";
-    }
-    throw std::runtime_error("Unhandled data format");
-}
-
-[[nodiscard]] Request::DataFormat toDataFormat(const std::string &format)
-{
-    if (format == "miniseed")
-    {
-        return Request::DataFormat::MiniSEED; 
-    }
-    else if (format == "geocsv")
-    {
-        return Request::DataFormat::GeoCSV;
-    }
-    else if (format == "geocsv.inline")
-    {
-        return Request::DataFormat::GeoCSV_INLINE;
-    }
-    else if (format == "geocsv.zip")
-    {
-        return Request::DataFormat::GeoCSV_ZIP;
-    }
-    else if (format == "geocsv.tspair")
-    {
-        return Request::DataFormat::GeoCSV_TSPAIR;
-    }
-    else if (format == "geocsv.slist")
-    {
-        return Request::DataFormat::GeoCSV_SLIST;
-    }
-    throw std::invalid_argument(
-        "format must be miniseed, geocsv, geocsv.inline, geocsv.zip, geocsv.tspair, or geocsv.slist");
-}
 
 enum class CodeType : std::uint8_t 
 {
@@ -394,7 +330,7 @@ Request::Request(const std::string &query)
         }   
         else if (*whichParameter == Parameter::Format)
         {
-            request.setDataFormat(::toDataFormat(parameter.value));
+            request.setDataFormat(Details::toDataFormat(parameter.value));
         }
         else if (*whichParameter == Parameter::NoData)
         {
@@ -590,8 +526,8 @@ std::string Request::toString() const
     // logic to append amperstands
     std::string query;
     auto [startTime, endTime] = getStartAndEndTime();
-    query.append("start=" + ::toISO8601(startTime));
-    query.append("&end=" + ::toISO8601(endTime));
+    query.append("start=" + Details::toISO8601(startTime));
+    query.append("&end=" + Details::toISO8601(endTime));
 
     auto network = getNetwork();
     if (network != std::nullopt)
@@ -614,7 +550,7 @@ std::string Request::toString() const
         query.append("&loc=" + *locationCode);
     }
 
-    query.append("&" + ::toString(getDataFormat()));
+    query.append("&" + Details::toString(getDataFormat()));
 
     if (noDataIs404())
     {

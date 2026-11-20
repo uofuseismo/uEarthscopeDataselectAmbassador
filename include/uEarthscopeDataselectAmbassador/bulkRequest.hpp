@@ -12,8 +12,10 @@ namespace UEarthscopeDataselectAmbassador
 ///            MIT NO AI license.
 class BulkRequest
 {
+private:
+    using RequestType = std::vector<Request>;
 public:
-
+    using const_iterator = typename RequestType::const_iterator;
 public:
     /// @brief Constructor.
     BulkRequest();
@@ -23,6 +25,10 @@ public:
     BulkRequest(BulkRequest &&request) noexcept;
     /// @brief Constructs from a POST string. 
     explicit BulkRequest(const std::string &body);
+
+    /// @brief Sets the requests.
+    void setRequests(const std::vector<Request> &requests);
+    void setRequests(std::vector<Request> &&requests);
 
     /// @brief A list of requests 
 //    [[nodiscard]] const std::vector<Request> &getRequests() const noexcept;
@@ -40,6 +46,11 @@ public:
     BulkRequest& operator=(const BulkRequest &request);
     /// @brief Move assignment.
     BulkRequest& operator=(BulkRequest &&request) noexcept; 
+
+    [[nodiscard]] const_iterator begin() const;
+    [[nodiscard]] const_iterator end() const;
+    [[nodiscard]] const_iterator cbegin() const;
+    [[nodiscard]] const_iterator cend() const;
 private:
     class BulkRequestImpl;
     std::unique_ptr<BulkRequestImpl> pImpl;

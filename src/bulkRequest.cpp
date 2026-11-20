@@ -1,5 +1,7 @@
 #include <array>
+#include <format>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -10,12 +12,13 @@
 #include <boost/algorithm/string/trim.hpp>
 #include "uEarthscopeDataselectAmbassador/bulkRequest.hpp"
 #include "uEarthscopeDataselectAmbassador/request.hpp"
+#include "formatUtilities.hpp"
 
 using namespace UEarthscopeDataselectAmbassador;
 
 namespace
 {
-constexpr int MAXIMUM_SELECTIONS{500};
+constexpr int MAXIMUM_SELECTIONS{1000};
 
 [[nodiscard]] bool isRetired(std::string_view key)
 {
@@ -29,6 +32,8 @@ constexpr int MAXIMUM_SELECTIONS{500};
 class BulkRequest::BulkRequestImpl
 {
 public:
+    std::vector<Request> mRequests;
+    Request::DataFormat mDataFormat{Request::DataFormat::MiniSEED};
     bool mNoDataIs404{false};
 };
 
@@ -61,6 +66,10 @@ BulkRequest::BulkRequest(const std::string &body)
     {
         boost::algorithm::trim(line);
         if (line.empty()){continue;}
+        if (line.find_first_of("&%") != std::string::npos)
+        {
+            throw std::invalid_argument("Invalid character in line");
+        }
         if (const auto equals = line.find('='); equals != std::string::npos)
         {
             auto key = boost::algorithm::trim_copy(line.substr(0, equals));
@@ -71,10 +80,6 @@ BulkRequest::BulkRequest(const std::string &body)
             }
             options.append("&" + line);
             continue;
-        }
-        if (line.find_first_of("&%") != std::string::npos)
-        {
-            throw std::invalid_argument("Invalid character in selection");
         }
         std::istringstream fields{line};
         std::array<std::string, 6> field;
@@ -94,6 +99,9 @@ BulkRequest::BulkRequest(const std::string &body)
                             + options);
     }
     if (requests.empty()){throw std::invalid_argument("No selections");}
+    BulkRequest bulkRequest;
+    bulkRequest.setRequests(std::move(requests));
+    *this = std::move(bulkRequest);
 }
 
 /// Copy assignment
@@ -115,3 +123,113 @@ BulkRequest& BulkRequest::operator=(BulkRequest &&request) noexcept
 
 /// Destructor
 BulkRequest::~BulkRequest() = default;
+
+/// Sets requests
+void BulkRequest::setRequests(const std::vector<Request> &requests)
+{
+    auto copy = requests;
+    setRequests(std::move(copy));
+}
+
+void BulkRequest::setRequests(std::vector<Request> &&requests)
+{
+    if (requests.empty())
+    {
+        throw std::invalid_argument("No requests set");
+    }
+    if (requests.size() > MAXIMUM_SELECTIONS)
+    {
+        throw std::invalid_argument("At most " 
+                                  + std::to_string(MAXIMUM_SELECTIONS)
+                                  + " allowed");
+    }
+    // Check duplicates
+    std::set<std::string> stringRequests;
+    for (const auto &request : requests)
+    {
+        if (!request.hasStartAndEndTime())
+        {
+            throw std::invalid_argument("Request start/end time not set");
+        }
+        auto stringRequest = request.toString();
+        if (stringRequests.contains(stringRequest))
+        {
+            throw std::invalid_argument("Duplicate request detected");
+        } 
+        stringRequests.insert(std::move(stringRequest));
+    }
+    // Check for inconsistent return codes and data formats
+    auto dataFormat = requests.at(0).getDataFormat();
+    auto noDataIs404 = requests[0].noDataIs404();
+    for (int i = 1; i < static_cast<int> (requests.size()); ++i)
+    {
+        if (dataFormat != requests[i].getDataFormat())
+        {
+            throw std::invalid_argument("Inconsistent data format");
+        }
+        if (noDataIs404 != requests[i].noDataIs404())
+        {
+            throw std::invalid_argument("Inconsistent 204/404");
+        }
+    }
+    pImpl->mRequests = std::move(requests);
+    pImpl->mDataFormat = dataFormat;
+    pImpl->mNoDataIs404 = noDataIs404;
+}
+
+Request::DataFormat BulkRequest::getDataFormat() const noexcept
+{
+    return pImpl->mDataFormat;
+}
+
+bool BulkRequest::noDataIs404() const noexcept
+{
+    return pImpl->mNoDataIs404;
+}
+
+/// To string
+std::string BulkRequest::toString() const
+{
+    if (pImpl->mRequests.empty())
+    {
+        throw std::runtime_error("No requests set");
+    }
+    std::string result{Details::toString(getDataFormat())};
+    result.append(noDataIs404() ? "\nnodata=404\n" : "\nnodata=204\n");
+    for (const auto &request : pImpl->mRequests)
+    {
+        const auto [startTime, endTime] = request.getStartAndEndTime();
+        result.append(std::format("{} {} {} {} {} {}\n",
+                                  request.getNetwork().value_or("*"),
+                                  request.getStation().value_or("*"),
+                                  request.getLocationCode().value_or("--"),
+                                  request.getChannel().value_or("*"),
+                                  Details::toISO8601(startTime),
+                                  Details::toISO8601(endTime)));
+         
+    }
+    return result;
+}
+
+/// Iterators
+BulkRequest::const_iterator BulkRequest::begin() const
+{
+    return pImpl->mRequests.cbegin();
+}
+
+BulkRequest::const_iterator BulkRequest::end() const
+{
+    return pImpl->mRequests.cend();
+}
+
+BulkRequest::const_iterator BulkRequest::cbegin() const
+{
+    return pImpl->mRequests.cbegin();
+}
+
+BulkRequest::const_iterator BulkRequest::cend() const
+{
+    return pImpl->mRequests.cend();
+}
+
+

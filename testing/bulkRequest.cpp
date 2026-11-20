@@ -1,4 +1,6 @@
 #include <chrono>
+#include <cstddef>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -23,6 +25,22 @@ const std::string CANONICAL_ANMO{
 const std::string CANONICAL_CTU{
     "UU CTU 01 HHZ 2024-01-01T00:00:00.000000 2024-01-01T00:10:00.000000\n"};
 const std::string DEFAULT_OPTIONS{"format=miniseed\nnodata=204\n"};
+
+[[nodiscard]] std::ptrdiff_t count(const BulkRequest &bulk)
+{
+    return std::distance(bulk.begin(), bulk.end());
+}
+
+[[nodiscard]] std::string distinctSelections(const int n)
+{
+    std::string body;
+    for (int i = 0; i < n; ++i)
+    {
+        body.append("IU S" + std::to_string(i)
+                  + " 00 BHZ 2024-01-01T00:00:00 2024-01-01T00:10:00\n");
+    }
+    return body;
+}
 }
 
 TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - parse",
@@ -36,7 +54,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - parse",
             "longestonly=true\n"
             + ANMO + "\n"
             + CTU + "\n"};
-        REQUIRE(bulk.getRequests().size() == 2);
+        REQUIRE(::count(bulk) == 2);
         REQUIRE(bulk.getDataFormat() == Request::DataFormat::MiniSEED);
         REQUIRE_FALSE(bulk.noDataIs404());
         REQUIRE(bulk.toString() == DEFAULT_OPTIONS + CANONICAL_ANMO + CANONICAL_CTU);
@@ -45,7 +63,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - parse",
     SECTION("Each selection is a full request")
     {
         const BulkRequest bulk{ANMO + "\n"};
-        const auto &request = bulk.getRequests().at(0);
+        const auto &request = *bulk.begin();
         REQUIRE(request.getNetwork() == "IU");
         REQUIRE(request.getStation() == "ANMO");
         REQUIRE(request.getLocationCode() == "00");
@@ -57,7 +75,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - parse",
     SECTION("No trailing newline")
     {
         const BulkRequest bulk{ANMO};
-        REQUIRE(bulk.getRequests().size() == 1);
+        REQUIRE(::count(bulk) == 1);
     }
 
     SECTION("CRLF, blank lines, tabs, and extra spaces")
@@ -86,7 +104,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - parse",
     {
         const BulkRequest bulk{
             "IU ANMO 00 BHZ 2024-01-01T00:00:00.5Z 2024-01-01T00:10:00.123456Z\n"};
-        REQUIRE(bulk.getRequests().at(0).getStartAndEndTime()
+        REQUIRE(bulk.begin()->getStartAndEndTime()
              == std::pair {JAN_01_2024 + std::chrono::milliseconds {500},
                            JAN_01_2024 + TEN_MINUTES
                          + std::chrono::microseconds {123456}});
@@ -101,7 +119,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - parse",
             + CTU + "\n"};
         REQUIRE(bulk.getDataFormat() == Request::DataFormat::GeoCSV);
         REQUIRE(bulk.noDataIs404());
-        for (const auto &request : bulk.getRequests())
+        for (const auto &request : bulk)
         {
             REQUIRE(request.getDataFormat() == Request::DataFormat::GeoCSV);
             REQUIRE(request.noDataIs404());
@@ -118,9 +136,7 @@ TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - parse",
 
     SECTION("1000 selections is the limit")
     {
-        std::string body;
-        for (int i = 0; i < 1000; ++i){body.append(ANMO + "\n");}
-        REQUIRE(BulkRequest{body}.getRequests().size() == 1000);
+        REQUIRE(::count(BulkRequest{::distinctSelections(1000)}) == 1000);
     }
 
     SECTION("Copy and move")
@@ -199,9 +215,20 @@ TEST_CASE("UEarthscopeDataselectAmbassador::BulkRequest - rejects",
 
     SECTION("More than 1000 selections")
     {
-        std::string body;
-        for (int i = 0; i < 1001; ++i){body.append(ANMO + "\n");}
-        REQUIRE_THROWS_AS(BulkRequest{body}, std::invalid_argument);
+        REQUIRE_THROWS_AS(BulkRequest{::distinctSelections(1001)},
+                          std::invalid_argument);
+    }
+
+    SECTION("Duplicate selections")
+    {
+        REQUIRE_THROWS_AS(BulkRequest{ANMO + "\n" + CTU + "\n" + ANMO + "\n"},
+                          std::invalid_argument);
+    }
+
+    SECTION("Options that change after a selection")
+    {
+        REQUIRE_THROWS_AS(BulkRequest{ANMO + "\nnodata=404\n" + CTU + "\n"},
+                          std::invalid_argument);
     }
 
     SECTION("Error messages don't echo input")
