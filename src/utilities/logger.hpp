@@ -21,7 +21,7 @@
 #include <opentelemetry/logs/logger_provider.h>
 #include <opentelemetry/sdk/logs/logger_provider_factory.h>
 #include <opentelemetry/sdk/logs/simple_log_record_processor_factory.h>
-#include "programOptions.hpp"
+//#include "programOptions.hpp"
 #include "otelSpdlogSink.hpp"
 
 namespace
@@ -147,7 +147,7 @@ std::shared_ptr<spdlog::logger>
 namespace UEarthscopeDataselectAmbassador::Logger
 {
 
-std::shared_ptr<spdlog::logger> initialize(const ::ProgramOptions &options)
+std::shared_ptr<spdlog::logger> initialize(const auto &options)
 {
     if (options.exportLogsWithHTTP)
     {

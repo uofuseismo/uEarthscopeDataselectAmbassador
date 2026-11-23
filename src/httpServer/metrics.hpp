@@ -23,7 +23,8 @@
 #include <opentelemetry/sdk/metrics/view/instrument_selector_factory.h>
 #include <opentelemetry/sdk/metrics/view/meter_selector_factory.h>
 #include <opentelemetry/sdk/metrics/view/view_factory.h>
-#include "otelOptions.hpp"
+#include "utilities/otelOptions.hpp"
+#include "httpServer/programOptions.hpp"
 
 namespace
 {
@@ -369,7 +370,7 @@ namespace UEarthscopeDataselectAmbassador::Metrics
 
 void initialize(
     // NOLINTNEXTLINE(misc-include-cleaner)
-    const ProgramOptions &options)
+    const ::ProgramOptions &options)
 {
     if (options.exportMetricsWithHTTP)
     {

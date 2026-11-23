@@ -26,11 +26,11 @@
 #include "uEarthscopeDataselectAmbassador/rateLimiter.hpp"
 #include "uEarthscopeDataselectAmbassador/request.hpp"
 #include "uEarthscopeDataselectAmbassador/version.hpp"
-#include "parseCommandLineOptions.hpp"
-#include "programOptions.hpp"
-#include "logger.hpp"
-#include "metrics.hpp"
-#include "crowHelper.hpp"
+#include "utilities/logger.hpp"
+#include "httpServer/metrics.hpp"
+#include "httpServer/parseCommandLineOptions.hpp"
+#include "httpServer/programOptions.hpp"
+#include "httpServer/crowHelper.hpp"
 
 /*
 namespace

@@ -90,7 +90,7 @@ if (Git_FOUND)
 else()
    set(uEventAnalysisToolBackend_GITTAG "") 
 endif()
-configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
+configure_file(${CMAKE_SOURCE_DIR}/lib/version.hpp.in
                ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}/version.hpp)
 
 set(HEADER_FILES 
@@ -105,16 +105,16 @@ set(HEADER_FILES
     include/${PROJECT_NAME}/request.hpp)
 
 set(LIBRARY_SRC
-    src/bulkRequest.cpp
-    src/curlGlobal.cpp
-    src/earthscopeClient.cpp
-    src/earthscopeClientOptions.cpp
-    src/metricsSingleton.cpp
-    src/noDataCache.cpp
-    src/noDataCacheOptions.cpp
-    src/rateLimiter.cpp
-    src/request.cpp
-    src/version.cpp)
+    lib/bulkRequest.cpp
+    lib/curlGlobal.cpp
+    lib/earthscopeClient.cpp
+    lib/earthscopeClientOptions.cpp
+    lib/metricsSingleton.cpp
+    lib/noDataCache.cpp
+    lib/noDataCacheOptions.cpp
+    lib/rateLimiter.cpp
+    lib/request.cpp
+    lib/version.cpp)
 
 if (${BUILD_SHARED_LIBS})
    add_library(libuEarthscopeDataselectAmbassador SHARED ${LIBRARY_SRC})
@@ -129,7 +129,7 @@ set_target_properties(libuEarthscopeDataselectAmbassador PROPERTIES
                       CXX_EXTENSIONS NO)
 target_include_directories(libuEarthscopeDataselectAmbassador
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-                           PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+                           PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/lib>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
                            PUBLIC  $<INSTALL_INTERFACE:>
                           )
@@ -153,7 +153,7 @@ target_sources(libuEarthscopeDataselectAmbassador
                )
 
 add_executable(uEarthscopeDataselectAmbassador
-               src/main.cpp)
+               src/httpServer/main.cpp)
 set_target_properties(uEarthscopeDataselectAmbassador PROPERTIES
                       CXX_STANDARD 23
                       CXX_STANDARD_REQUIRED YES
@@ -161,6 +161,7 @@ set_target_properties(uEarthscopeDataselectAmbassador PROPERTIES
 target_include_directories(uEarthscopeDataselectAmbassador
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+                           PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/lib>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
                           )
 target_link_libraries(uEarthscopeDataselectAmbassador
@@ -209,6 +210,7 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    target_include_directories(unitTests
                               PRIVATE ${CMAKE_SOURCE_DIR}/include
                                       ${CMAKE_SOURCE_DIR}/src
+                                      ${CMAKE_SOURCE_DIR}/lib
                                       ${CMAKE_CURRENT_BINARY_DIR}/include)
    target_link_libraries(unitTests
                          PRIVATE uEarthscopeDataselectAmbassador::libuEarthscopeDataselectAmbassador

@@ -12,7 +12,7 @@
 #endif
 #include "uEarthscopeDataselectAmbassador/earthscopeClientOptions.hpp"
 #include "uEarthscopeDataselectAmbassador/noDataCacheOptions.hpp"
-#include "otelOptions.hpp"
+#include "utilities/otelOptions.hpp"
 
 namespace
 {
