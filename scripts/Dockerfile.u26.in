@@ -32,8 +32,12 @@ RUN apt-get update &&\
 
 # User can execute but not replace binary
 COPY --from=unpack --chown=0:0 --chmod=0555 \
-     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeDataselectAmbassador \
-     /usr/local/bin/uEarthscopeDataselectAmbassador
+     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeHTTPDataselectAmbassador \
+     /usr/local/bin/uEarthscopeDataselectHTTPAmbassador
+
+COPY --from=unpack --chown=0:0 --chmod=0555 \
+     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeGRPCDataselectAmbassador \
+     /usr/local/bin/uEarthscopeDataselectGRPCAmbassador
 
 # Run read-only (i.e. readOnlyRootFilesystem: true, no emptyDir)
 USER ${RUN_UID}:${RUN_GID}
@@ -43,5 +47,5 @@ STOPSIGNAL SIGTERM
 # CMD and no ENTRYPOINT, so a pod spec supplying command+args replaces this
 # outright.  With an ENTRYPOINT, an args-only override would be appended to
 # the binary instead of replacing it.
-CMD ["/usr/local/bin/uEarthscopeDataselectAmbassador", "--ini=/config/config.ini"]
+CMD ["/usr/local/bin/uEarthscopeDataselectHTTPAmbassador", "--ini=/config/config.ini"]
 
