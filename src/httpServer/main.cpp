@@ -391,6 +391,11 @@ int main(int argc, char *argv[])
         auto response = ::toCrowResponse(earthscopeClient.get(*request), *logger);
         if (response.code == 200)
         {
+            auto elapsedTime = std::chrono::steady_clock::now() - startClock;
+            Metrics::recordClientRequestDuration(
+                "get",
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   elapsedTime));
             SPDLOG_LOGGER_INFO(
                 logger,
                 "Successful Earthscope query for {}.{}.{}.{} -> {} ({} bytes, {} ms)",
@@ -400,7 +405,7 @@ int main(int argc, char *argv[])
                 request->getChannel().value_or("*"),
                 response.code, response.body.size(),
                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - startClock).count());
+                    elapsedTime).count());
         }
         else if (response.code == 204)
         {
@@ -417,6 +422,11 @@ int main(int argc, char *argv[])
                                        e.what() );
                 }
             }
+            auto elapsedTime = std::chrono::steady_clock::now() - startClock;
+            Metrics::recordClientRequestDuration(
+                "get",
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   elapsedTime));
             SPDLOG_LOGGER_INFO(
                 logger,
                 "Earthscope query generated no data for {}.{}.{}.{} -> ({} ms)",
@@ -425,10 +435,15 @@ int main(int argc, char *argv[])
                 request->getLocationCode().value_or("*"),
                 request->getChannel().value_or("*"),
                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - startClock).count());
+                    elapsedTime).count());
         }
         else
         {
+            auto elapsedTime = std::chrono::steady_clock::now() - startClock;
+            Metrics::recordClientRequestDuration(
+                "get",
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   elapsedTime));
             SPDLOG_LOGGER_WARN(
                 logger,
                 "GET request for {}.{}.{}.{} failed",
@@ -517,6 +532,11 @@ int main(int argc, char *argv[])
         const auto &first = *bulkRequest->begin();
         if (response.code == 200)
         {
+            auto elapsedTime = std::chrono::steady_clock::now() - startClock;
+            Metrics::recordClientRequestDuration(
+                "post",
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   elapsedTime));
             SPDLOG_LOGGER_INFO(
                 logger,
                 "POST {} selections (first {}.{}.{}.{}) -> {} ({} bytes, {} ms)",
@@ -528,7 +548,7 @@ int main(int argc, char *argv[])
                 response.code,
                 response.body.size(),
                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - startClock).count());
+                    elapsedTime).count());
         }
         else if (response.code == 204)
         {
@@ -550,6 +570,11 @@ int main(int argc, char *argv[])
                 }
             }
             int code = bulkRequest->noDataIs404() ? 404 : 204; 
+            auto elapsedTime = std::chrono::steady_clock::now() - startClock;
+            Metrics::recordClientRequestDuration(
+                "post",
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   elapsedTime));
             SPDLOG_LOGGER_INFO(
                 logger,
                 "POST {} selections generated no data (first {}.{}.{}.{}) -> {} ({} ms)",
@@ -560,7 +585,7 @@ int main(int argc, char *argv[])
                 first.getChannel().value_or("*"),
                 code,
                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - startClock).count());
+                    elapsedTime).count());
              if (bulkRequest->noDataIs404())
              {
                  return ::toErrorResponse(404, "Not Found", "No data available");
@@ -568,6 +593,11 @@ int main(int argc, char *argv[])
         }
         else
         {
+            auto elapsedTime = std::chrono::steady_clock::now() - startClock;
+            Metrics::recordClientRequestDuration(
+                "post",
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   elapsedTime));
             SPDLOG_LOGGER_WARN(
                 logger,
                 "POST {} selections (first {}.{}.{}.{}) -> {} ({} ms) failed",
@@ -578,7 +608,7 @@ int main(int argc, char *argv[])
                 first.getChannel().value_or("*"),
                 response.code,
                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - startClock).count());
+                    elapsedTime).count());
         }
         return response;
     });

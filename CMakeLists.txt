@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(uEarthscopeDataselectAmbassador VERSION 0.1.0 LANGUAGES CXX)
+project(uEarthscopeDataselectAmbassador VERSION 0.1.1 LANGUAGES CXX)
 enable_testing()
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
@@ -31,7 +31,7 @@ endif()
 find_package(spdlog REQUIRED)
 find_package(Boost REQUIRED headers program_options url REQUIRED)
 find_package(Threads REQUIRED)
-#find_package(libmseed REQUIRED)
+find_package(libmseed REQUIRED)
 find_package(Crow REQUIRED)
 if (${ENABLE_COMPRESSION})
    set(CROW_ENABLE_COMPRESSION ON) 
@@ -139,6 +139,7 @@ target_link_libraries(libuEarthscopeDataselectAmbassador
                               Boost::program_options
                               Boost::url
                               Threads::Threads
+                              mseed::mseed
                               CURL::libcurl)
 target_sources(libuEarthscopeDataselectAmbassador
                PUBLIC FILE_SET

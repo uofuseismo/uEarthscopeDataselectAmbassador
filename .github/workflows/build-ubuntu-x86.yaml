@@ -24,6 +24,7 @@ env:
   BUILD_TYPE: Release
   CXX: /usr/bin/clang++
   CC: /usr/bin/clang
+  LIBMSEED_VERSION: 3.6.0
 
 jobs:
   build:
@@ -63,6 +64,32 @@ jobs:
           -s:a compiler.libcxx=libstdc++11
           --output-folder .
 
+      # libmseed is not in Conan; build it static so the binary (and image)
+      # carry no runtime dependency on it.  Bump LIBMSEED_VERSION to upgrade;
+      # the cache key follows it.
+      - name: libmseed cache
+        uses: actions/cache@v5
+        id: cache-libmseed
+        with:
+          path: ~/third-party
+          key: ${{ runner.os }}-libmseed-${{ env.LIBMSEED_VERSION }}-static
+
+      - if: ${{ steps.cache-libmseed.outputs.cache-hit != 'true' }}
+        name: Build libmseed
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}"
+          wget -q https://github.com/EarthScope/libmseed/archive/refs/tags/v${LIBMSEED_VERSION}.tar.gz
+          tar -xf v${LIBMSEED_VERSION}.tar.gz
+          cmake -S libmseed-${LIBMSEED_VERSION} -B libmseed-build \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DBUILD_STATIC_LIBS=ON \
+                -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+                -DCMAKE_INSTALL_PREFIX=${HOME}/third-party
+          cmake --build libmseed-build
+          cmake --install libmseed-build
+
       - name: Configure and build
         run: |
           cmake --preset conan-release \
@@ -70,6 +97,7 @@ jobs:
                 -DENABLE_SSL=ON \
                 -DENABLE_COMPRESSION=ON \
                 -DBUILD_CONTAINER=ON \
+                -Dlibmseed_DIR=${HOME}/third-party/lib/cmake/libmseed \
                 -DCMAKE_CXX_FLAGS="-Wall -Wextra"
           cmake --build --preset conan-release
           # The test and package jobs need the presets to find build/Release

@@ -47,9 +47,8 @@ opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     rateLimitedCounter{nullptr};
 opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     cache204HitCounter{nullptr};
-
-
-
+opentelemetry::nostd::unique_ptr<opentelemetry::metrics::Histogram<double>>
+    routePerformanceHistogram{nullptr};
 
 
 void initializeRouteHistogram(
@@ -80,6 +79,7 @@ void initializeRouteHistogram(
                                10.00,
                                60.00,
                                120.0,
+                               300.0,
                                };
     // The view RENAMES the metric on export, so this has to stay the
     // instrument's name.
@@ -363,6 +363,16 @@ void observe204CacheHits(
     }
 }
 
+auto makeInt64Counter( 
+    auto &meter, const char *name, const char *description,
+    const char *unit,
+    opentelemetry::metrics::ObservableCallbackPtr callback)
+{
+    auto counter = meter->CreateInt64ObservableCounter(name, description, unit);
+    counter->AddCallback(callback, nullptr);
+    return counter;
+}
+
 }
 
 namespace UEarthscopeDataselectAmbassador::Metrics
@@ -387,6 +397,36 @@ void initialize(
 #endif
     }
 }
+
+/*
+void recordEarthscopePostRequestDuration(
+    const std::chrono::nanoseconds &duration)
+{
+    if (!metricsInitialized){return;}
+    auto durationSeconds = static_cast<double> (duration.count())*1.e-9;
+    std::map<std::string, std::string> histogramKey{ {"request_type", "post"} };
+    earthscopePerformanceHistogram->Record(durationSeconds, histogramKey);
+}
+
+void recordEarthscopeGetRequestDuration(
+    const std::chrono::nanoseconds &duration)
+{
+    if (!metricsInitialized){return;}
+    auto durationSeconds = static_cast<double> (duration.count())*1.e-9;
+    std::map<std::string, std::string> histogramKey{ {"request_type", "get"} };
+    earthscopePerformanceHistogram->Record(durationSeconds, histogramKey);
+}
+*/
+
+void recordClientRequestDuration(const std::string &route,
+                                 const std::chrono::nanoseconds &duration)
+{
+    if (!metricsInitialized){return;}
+    auto durationSeconds = static_cast<double> (duration.count())*1.e-9;
+    std::map<std::string, std::string> histogramKey{ {"route", route} };
+    routePerformanceHistogram->Record(durationSeconds, histogramKey);
+}
+
 
 void cleanup()
 {
@@ -413,57 +453,57 @@ void createMeters(const ::ProgramOptions &options)
 
     // 200 counts (all routes)
     serverSuccessCounter
-        = meter->CreateInt64ObservableCounter(
+        = ::makeInt64Counter(
+             meter,
              "seismic_data.earthscope.server.responses.success",
              "Number of 200 responses to user.",
-             ""); 
-    serverSuccessCounter->AddCallback(::observeServerSuccessCounts, nullptr);
+             "",
+             ::observeServerSuccessCounts);
 
     // Rate limited counts
     rateLimitedCounter
-        = meter->CreateInt64ObservableCounter(
+        = ::makeInt64Counter(
+             meter,
              "seismic_data.earthscope.server.rate_limited_requests",
              "Number of requests rejected by the rate limiter",
-             "{request}");
-    rateLimitedCounter->AddCallback(
-        ::observeRateLimitedRequestsCounts, nullptr);
-
+             "{request}",
+             ::observeRateLimitedRequestsCounts);
 
     // Earthscope request counts
     earthscopeRequestsCounter
-        = meter->CreateInt64ObservableCounter(
+        = ::makeInt64Counter(
+             meter,
              "seismic_data.earthscope.client.requests",
              "Number of requests made to Earthscope",
-             "{request}"); 
-    earthscopeRequestsCounter->AddCallback(
-        ::observeEarthscopeRequestCounts, nullptr);
+             "{request}",
+             ::observeEarthscopeRequestCounts);
 
     // Earthscope retries counts
-    earthscopeRequestsCounter
-        = meter->CreateInt64ObservableCounter(
+    earthscopeRetriesCounter
+        = ::makeInt64Counter(
+             meter,
              "seismic_data.earthscope.client.retried_requests",
              "Number of retried requests made to Earthscope",
-             "{request}"); 
-    earthscopeRequestsCounter->AddCallback(
-        ::observeEarthscopeRetriesCounts, nullptr);
+             "{request}",
+             ::observeEarthscopeRetriesCounts);
 
     // Data download
     bytesDownloadedCounter
-        = meter->CreateInt64ObservableCounter(
+        = ::makeInt64Counter(
+             meter,
              "seismic_data.earthscope.client.downloaded",
-             "Amount of data downloaded in bytes",
-             "By");
-    bytesDownloadedCounter->AddCallback(
-        ::observeEarthscopeBytesDownloaded, nullptr); 
+             "Amount of data downloaded from Earthscope's dataselect in bytes",
+             "By",
+             ::observeEarthscopeBytesDownloaded);
 
     // 204 cache hits
     cache204HitCounter
-        = meter->CreateInt64ObservableCounter(
+        = ::makeInt64Counter( 
+             meter,
              "seismic_data.earthscope.server.no_data_cache_hit_rejections",
              "Amount of requests rejected because they are duplicates of previous 204 requests",
-             "{request}");
-    bytesDownloadedCounter->AddCallback(
-        ::observe204CacheHits, nullptr); 
+             "{request}",
+             ::observe204CacheHits);
 /*
     // 200 counts from earthscope
     clientSuccessCounter
@@ -473,6 +513,14 @@ void createMeters(const ::ProgramOptions &options)
              "");
     clientSuccessCounter->AddCallback(::observeClientSuccessCounts, nullptr);
 */
+
+    auto routeHistogramMeter
+        = provider->GetMeter("route_duration_histogram", "1.2.0");
+    routePerformanceHistogram 
+        = routeHistogramMeter->CreateDoubleHistogram(
+            "seismic_data.earthscope.server.route.duration",
+            "Time required for a route to succcessfully complete",
+            "s");
 }
 
 }
