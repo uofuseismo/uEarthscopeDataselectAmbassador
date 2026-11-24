@@ -32,11 +32,11 @@ RUN apt-get update &&\
 
 # User can execute but not replace binary
 COPY --from=unpack --chown=0:0 --chmod=0555 \
-     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeHTTPDataselectAmbassador \
+     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeDataselectHTTPAmbassador \
      /usr/local/bin/uEarthscopeDataselectHTTPAmbassador
 
 COPY --from=unpack --chown=0:0 --chmod=0555 \
-     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeGRPCDataselectAmbassador \
+     /tmp/@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uEarthscopeDataselectGRPCAmbassador \
      /usr/local/bin/uEarthscopeDataselectGRPCAmbassador
 
 # Run read-only (i.e. readOnlyRootFilesystem: true, no emptyDir)
