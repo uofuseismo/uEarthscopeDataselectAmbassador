@@ -226,8 +226,9 @@ int main(int argc, char *argv[])
     //NOLINTNEXTLINE(misc-include-cleaner)
     auto consoleLogger = spdlog::stdout_color_st("console");
     SPDLOG_LOGGER_INFO(consoleLogger,
-                       "Running version {} of uEarthscopeDataselectAmbassador",
-                       Version::getVersionWithTag());
+                       "Running version {} of {}",
+                       Version::getVersionWithTag(),
+                       APPLICATION_NAME);
 
     // Parse the command line arguments
     std::filesystem::path iniFile;

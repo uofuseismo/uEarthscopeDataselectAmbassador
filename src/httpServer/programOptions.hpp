@@ -16,7 +16,7 @@
 
 namespace
 {
-constexpr std::string_view APPLICATION_NAME{"uEarthscopeDataselectAmbassador"};
+constexpr std::string_view APPLICATION_NAME{"uEarthscopeDataselectHTTPAmbassador"};
 constexpr int MAX_REQUESTS_PER_SECOND{50};
 
 struct CrowOptions
@@ -187,7 +187,7 @@ struct ProgramOptions
         boost::property_tree::ptree propertyTree;
         boost::property_tree::ini_parser::read_ini(iniFile, propertyTree);
         applicationName
-            = propertyTree.get<std::string> ("General.applicationName",
+            = propertyTree.get<std::string> ("General.application",
                                              applicationName);
         if (applicationName.empty()){applicationName = APPLICATION_NAME;}
         verbosity
