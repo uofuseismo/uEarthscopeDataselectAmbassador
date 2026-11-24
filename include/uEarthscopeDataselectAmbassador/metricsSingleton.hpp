@@ -36,11 +36,16 @@ public:
     /// @result The number of unauthorized request to Earthscope.
     [[nodiscard]] int64_t getClientUnauthorizedCounts() const noexcept;
 
+    /// @brief Counts the number of 204 responses from Earthscope.
+    void incrementEarthscope204ResponseCounter() noexcept;
+    /// @result The number of 204 resposnes from Earthscope.
+    [[nodiscard]] int64_t getEarthscope204ResponseCounts() const noexcept;
+/*
     /// @brief Counts the number of unauthenticated requests to Earthscope.
     void incrementClientUnauthenticatedCounter() noexcept;
     /// @result The number of unauthenticated attempts to EArthscope.
     [[nodiscard]] int64_t getClientUnauthenticatedCounts() const noexcept;
-
+*/
     /// @brief Updates the number of bytes downloaded from Earthscope.
     void incrementBytesDownloadedCounter(const uint32_t nBytes);
     /// @result The number of bytes received.
@@ -83,10 +88,10 @@ private:
     std::map<std::string, int64_t> mClientErrorCounterMap; // 400 response codes
     std::map<std::string, int64_t> mSuccessCounterMap;     // 200 response codes
     std::atomic<int64_t> mClientUnauthorizedCounter{0};
-    std::atomic<int64_t> mClientUnauthenticatedCounter{0};
     std::atomic<int64_t> m204CacheHitCounter{0};
     std::atomic<int64_t> mRateLimitedRequestsCounter{0};
     std::atomic<int64_t> mBytesDownloadedCounter{0};
+    std::atomic<int64_t> mEarthscope204ResponseCounter{0};
     std::atomic<int64_t> mEarthscopeRequestsCounter{0};
     std::atomic<int64_t> mEarthscopeRetriesCounter{0};
 };

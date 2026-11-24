@@ -36,6 +36,10 @@ opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     clientErrorCounter{nullptr};
 opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    earthscopeUnauthorizedCounter{nullptr};
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    earthscope204ResponsesCounter{nullptr};
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     serverErrorCounter{nullptr};
 opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
     bytesDownloadedCounter{nullptr};
@@ -251,6 +255,60 @@ void observeEarthscopeRequestCounts(
     }
 }
 
+// Bad earthscope credentials
+void observeEarthscopeUnauthorizedCounts(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {   
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        auto &instance
+            = UEarthscopeDataselectAmbassador::Metrics::
+                 MetricsSingleton::getInstance();
+        observer->Observe(instance.getClientUnauthorizedCounts());
+    }   
+}
+
+// Earthscope 204 counts
+void observeEarthscope204ResponseCounts(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <   
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >   
+        > (observerResult))
+    {   
+        auto observer = opentelemetry::nostd::get
+        <   
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        auto &instance
+            = UEarthscopeDataselectAmbassador::Metrics::
+                 MetricsSingleton::getInstance();
+        observer->Observe(instance.getEarthscope204ResponseCounts());
+    }
+}
+ 
 // Earthscope retries counts
 void observeEarthscopeRetriesCounts(
     opentelemetry::metrics::ObserverResult observerResult,
@@ -477,6 +535,24 @@ void createMeters(const ::ProgramOptions &options)
              "Number of requests made to Earthscope",
              "{request}",
              ::observeEarthscopeRequestCounts);
+
+    // Passed wrong creds to earthscope
+    earthscopeUnauthorizedCounter
+        = ::makeInt64Counter(
+             meter,
+             "seismic_data.earthscope.client.unauthorized",
+             "Number of requests rejected by Earthscope because of invalid credentials",
+             "{request}",
+             ::observeEarthscopeUnauthorizedCounts);
+
+    // 204 responses from earthscope
+    earthscope204ResponsesCounter
+       = ::makeInt64Counter(
+            meter,
+            "seismic_data.earthscope.client.no_data",
+            "Number of 204 responses returned from Earthscope",
+            "{response}",
+            ::observeEarthscope204ResponseCounts); 
 
     // Earthscope retries counts
     earthscopeRetriesCounter

@@ -8,6 +8,7 @@
 #include <spdlog/logger.h>
 #include <crow/http_response.h>
 #include "uEarthscopeDataselectAmbassador/earthscopeClient.hpp"
+#include "uEarthscopeDataselectAmbassador/metricsSingleton.hpp"
 #include "uEarthscopeDataselectAmbassador/request.hpp"
 
 namespace
@@ -91,6 +92,8 @@ namespace
     }
     else if (upstream.status == 401 || upstream.status == 403)
     {
+        UEarthscopeDataselectAmbassador::Metrics
+            ::MetricsSingleton::getInstance().incrementClientUnauthorizedCounter();
         SPDLOG_LOGGER_CRITICAL(&logger,
                                "EarthScope rejected our credentials ({})",
                                upstream.status);

@@ -141,6 +141,17 @@ int64_t MetricsSingleton::getEarthscopeRequestsCount() const noexcept
     return mEarthscopeRequestsCounter.load(std::memory_order_relaxed);
 }
 
+// Earthscope 204 response counts
+void MetricsSingleton::incrementEarthscope204ResponseCounter() noexcept
+{
+    mEarthscope204ResponseCounter.fetch_add(1, std::memory_order_relaxed);
+}
+
+int64_t MetricsSingleton::getEarthscope204ResponseCounts() const noexcept
+{
+    return mEarthscope204ResponseCounter.load(std::memory_order_relaxed);
+}
+
 // Earthscope retry counter
 void MetricsSingleton::incrementEarthscopeRetriesCounter() noexcept
 {
@@ -169,8 +180,8 @@ void MetricsSingleton::resetMetrics() noexcept
 {
     const std::scoped_lock lock{mMutex};
     mClientUnauthorizedCounter.store(0);
-    mClientUnauthenticatedCounter.store(0);
     mBytesDownloadedCounter.store(0);
+    mEarthscope204ResponseCounter.store(0);
     mEarthscopeRequestsCounter.store(0);
     mEarthscopeRetriesCounter.store(0);
     mRateLimitedRequestsCounter.store(0);
