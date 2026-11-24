@@ -190,6 +190,44 @@ else()
                                  opentelemetry-cpp::otlp_http_metric_exporter)
 endif()
 
+add_executable(uEarthscopeDataselectGRPCAmbassador
+               src/grpcServer/main.cpp)
+set_target_properties(uEarthscopeDataselectGRPCAmbassador PROPERTIES
+                      CXX_STANDARD 23
+                      CXX_STANDARD_REQUIRED YES 
+                      CXX_EXTENSIONS NO) 
+target_include_directories(uEarthscopeDataselectGRPCAmbassador
+                           PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+                           PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+                           PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/lib>
+                           PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+                          )   
+target_link_libraries(uEarthscopeDataselectGRPCAmbassador
+                      PRIVATE uEarthscopeDataselectAmbassador::libuEarthscopeDataselectAmbassador
+                              Crow::Crow
+                              Boost::headers Boost::program_options)
+if (${WITH_CONAN})
+   target_link_libraries(uEarthscopeDataselectGRPCAmbassador
+                         PRIVATE opentelemetry-cpp::opentelemetry-cpp
+                                 opentelemetry-cpp::proto_grpc
+                                 opentelemetry-cpp::exporter_otlp_grpc
+                                 opentelemetry-cpp::exporter_otlp_grpc_client
+                                 opentelemetry-cpp::exporter_otlp_grpc_metrics
+                                 opentelemetry-cpp::exporter_otlp_http
+                                 opentelemetry-cpp::exporter_otlp_http_client
+                                 opentelemetry-cpp::exporter_otlp_http_metric
+                                 opentelemetry-cpp::exporter_otlp_http_log
+                                 opentelemetry-cpp::metrics
+                                 opentelemetry-cpp::common
+                                 opentelemetry-cpp::api)
+   target_compile_definitions(uEarthscopeDataselectGRPCAmbassador PRIVATE WITH_OTLP_GRPC)
+else()
+   target_link_libraries(uEarthscopeDataselectGRPCAmbassador
+                         PRIVATE opentelemetry-cpp::otlp_http_log_record_exporter
+                                 opentelemetry-cpp::otlp_http_metric_exporter)
+endif()
+
+
 ##########################################################################################
 #                                      Testing                                           #
 ##########################################################################################
@@ -240,6 +278,7 @@ install(TARGETS libuEarthscopeDataselectAmbassador
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         COMPONENT libraries)
 install(TARGETS uEarthscopeDataselectAmbassador
+                uEarthscopeDataselectGRPCAmbassador
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         COMPONENT applications)
 install(EXPORT ${PROJECT_NAME}Targets
@@ -289,7 +328,7 @@ if (${BUILD_CONTAINER})
                         COMMAND ${CMAKE_CPACK_COMMAND} -G TGZ 
                         COMMAND ${buildah_EXECUTABLE} bud -t uearthscopedataselectambassador:${PROJECT_VERSION} -t uearthscopedataselectambassador:latest -f ./Dockerfile.u26
                         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} VERBATIM)
-      add_dependencies(buildah uEarthscopeDataselectAmbassador)
+      add_dependencies(buildah uEarthscopeDataselectAmbassador uEarthscopeDataselectGRPCAmbassador)
    endif()
 endif()
 

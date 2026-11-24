@@ -15,13 +15,13 @@ std::pair<std::string, bool> parseCommandLineOptions(int argc, char *argv[])
 {
     std::string iniFile;
     boost::program_options::options_description desc(R"""(
-The uEarthscopeDataselectAmbassador GET requests from local clients then 
-enriches the request, propagates the request to Earthscope's Dataselect,
-and ultimately returns the response to the client.
+The uEarthscopeDataselectHTTPAmbassador handles GET and POST requests from
+local clients; enriches the request (with credentials), propagates the request
+to Earthscope's Dataselect, and ultimately returns the response to the client.
 
 Example usage is
 
-    uEarthscopeDataselectAmbassador --ini=httpServer.ini
+    uEarthscopeDataselectHTTPAmbassador --ini=httpServer.ini
 
 Allowed options)""");
     desc.add_options()
