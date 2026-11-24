@@ -396,6 +396,7 @@ int main(int argc, char *argv[])
                 "get",
                 std::chrono::duration_cast<std::chrono::nanoseconds>(
                    elapsedTime));
+            metrics.incrementSuccessCounter("get");
             SPDLOG_LOGGER_INFO(
                 logger,
                 "Successful Earthscope query for {}.{}.{}.{} -> {} ({} bytes, {} ms)",
@@ -537,6 +538,7 @@ int main(int argc, char *argv[])
                 "post",
                 std::chrono::duration_cast<std::chrono::nanoseconds>(
                    elapsedTime));
+            metrics.incrementSuccessCounter("post");
             SPDLOG_LOGGER_INFO(
                 logger,
                 "POST {} selections (first {}.{}.{}.{}) -> {} ({} bytes, {} ms)",
