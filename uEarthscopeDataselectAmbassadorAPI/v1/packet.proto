@@ -1,0 +1,22 @@
+edition = "2023";
+import "google/protobuf/timestamp.proto";
+
+package UEarthscopeDataselectAmbassadorAPI.V1;
+
+import "uEarthscopeDataselectAmbassadorAPI/v1/data_type.proto";
+
+/**
+ * Defines a packet of seismic data.
+ */
+message Packet {
+  // The packet's start time (UTC).
+  google.protobuf.Timestamp start_time = 1;
+  // The packet's sampling rate in Hz.
+  double sampling_rate = 2;
+  // The data type.
+  DataType data_type = 3;
+  // The number of samples in the packet.
+  uint32 number_of_samples = 4;
+  // The data in the packet.  This is always stored in little endian.
+  bytes data = 5;
+}
