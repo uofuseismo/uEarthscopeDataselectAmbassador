@@ -50,6 +50,27 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // Parse the ini file
+    ::ProgramOptions programOptions;
+    try
+    {
+        programOptions.parseInitializationFile(iniFile);
+    }
+    catch (const std::exception &e) 
+    {
+        SPDLOG_LOGGER_CRITICAL(consoleLogger,
+                               "Failed to read program options because {}",
+                               std::string {e.what()});
+        return EXIT_FAILURE;
+    }
+    if (getenv("OTEL_SERVICE_NAME") == nullptr)
+    {
+        constexpr int overwrite{1};
+        setenv("OTEL_SERVICE_NAME",
+               programOptions.applicationName.c_str(),
+               overwrite);
+    }
+
 
     return EXIT_SUCCESS;
 }

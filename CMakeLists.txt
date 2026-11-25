@@ -99,6 +99,7 @@ set(HEADER_FILES
     include/${PROJECT_NAME}/earthscopeClient.hpp
     include/${PROJECT_NAME}/earthscopeClientOptions.hpp
     include/${PROJECT_NAME}/grpc/requestIdentifierInterceptor.hpp
+    include/${PROJECT_NAME}/grpc/serverOptions.hpp
     include/${PROJECT_NAME}/metricsSingleton.hpp
     include/${PROJECT_NAME}/noDataCache.hpp
     include/${PROJECT_NAME}/noDataCacheOptions.hpp
@@ -111,7 +112,9 @@ set(LIBRARY_SRC
     lib/earthscopeClient.cpp
     lib/earthscopeClientOptions.cpp
     lib/grpc/requestIdentifierInterceptor.cpp
+    lib/grpc/serverOptions.cpp
     lib/metricsSingleton.cpp
+    lib/miniseed.cpp
     lib/noDataCache.cpp
     lib/noDataCacheOptions.cpp
     lib/rateLimiter.cpp
@@ -241,6 +244,8 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
        testing/bulkRequest.cpp
        testing/earthscopeClientOptions.cpp
        testing/earthscopeClient.cpp
+       testing/grpc/requestIdentifierInterceptor.cpp
+       testing/grpc/serverOptions.cpp
        testing/noDataCache.cpp
        testing/rateLimiter.cpp
        testing/request.cpp)
