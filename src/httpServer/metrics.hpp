@@ -54,6 +54,8 @@ opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 opentelemetry::nostd::unique_ptr<opentelemetry::metrics::Histogram<double>>
     routePerformanceHistogram{nullptr};
 
+const std::string HTTP_SERVER_HISTOGRAM_NAME{"seismic_data.earthscope.server.route.duration"};
+
 
 void initializeRouteHistogram(
     opentelemetry::sdk::metrics::MeterProvider *providerInstance)
@@ -61,13 +63,13 @@ void initializeRouteHistogram(
     auto histogramInstrumentSelector
         = opentelemetry::sdk::metrics::InstrumentSelectorFactory::Create(
              opentelemetry::sdk::metrics::InstrumentType::kHistogram,
-             "uearthscope-dataselect-ambassador.route.duration",
+             HTTP_SERVER_HISTOGRAM_NAME.c_str(), //"seismic_data.earthscope.server.route.duration",
              "s");
     auto histogramMeterSelector
         = opentelemetry::sdk::metrics::MeterSelectorFactory::Create(
              "route_duration_histogram",
              "1.2.0",
-             "https://opentelemetry.io/schemas/1.2.0");
+             "");
     auto histogramAggregationConfig
         = std::make_shared<opentelemetry::sdk::metrics::HistogramAggregationConfig> ();
     histogramAggregationConfig->boundaries_
@@ -89,7 +91,7 @@ void initializeRouteHistogram(
     // instrument's name.
     auto histogramView
         = opentelemetry::sdk::metrics::ViewFactory::Create(
-             "uearthscope-dataselect-ambassador.route.duration",
+             HTTP_SERVER_HISTOGRAM_NAME.c_str(), //"seismic_data.earthscope.server.route.duration",
              "Time required to for a route to succcessfully complete.",
              opentelemetry::sdk::metrics::AggregationType::kHistogram,
              histogramAggregationConfig);
@@ -594,7 +596,7 @@ void createMeters(const ::ProgramOptions &options)
         = provider->GetMeter("route_duration_histogram", "1.2.0");
     routePerformanceHistogram 
         = routeHistogramMeter->CreateDoubleHistogram(
-            "seismic_data.earthscope.server.route.duration",
+            HTTP_SERVER_HISTOGRAM_NAME.c_str(), //"seismic_data.earthscope.server.route.duration",
             "Time required for a route to succcessfully complete",
             "s");
 }

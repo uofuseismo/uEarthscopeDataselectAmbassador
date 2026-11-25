@@ -13,7 +13,7 @@
 #   The Earthscope dataselect ambassador library, if found.
 include(CMakeFindDependencyMacro)
 
-#find_dependency(gRPC CONFIG)
+find_dependency(gRPC CONFIG)
 find_dependency(spdlog)
 
 @PACKAGE_INIT@

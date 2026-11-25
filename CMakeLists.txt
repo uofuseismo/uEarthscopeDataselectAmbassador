@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(uEarthscopeDataselectAmbassador VERSION 0.1.3 LANGUAGES CXX)
+project(uEarthscopeDataselectAmbassador VERSION 0.1.4 LANGUAGES CXX)
 enable_testing()
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
@@ -98,6 +98,7 @@ set(HEADER_FILES
     include/${PROJECT_NAME}/curlGlobal.hpp
     include/${PROJECT_NAME}/earthscopeClient.hpp
     include/${PROJECT_NAME}/earthscopeClientOptions.hpp
+    include/${PROJECT_NAME}/grpc/requestIdentifierInterceptor.hpp
     include/${PROJECT_NAME}/metricsSingleton.hpp
     include/${PROJECT_NAME}/noDataCache.hpp
     include/${PROJECT_NAME}/noDataCacheOptions.hpp
@@ -109,6 +110,7 @@ set(LIBRARY_SRC
     lib/curlGlobal.cpp
     lib/earthscopeClient.cpp
     lib/earthscopeClientOptions.cpp
+    lib/grpc/requestIdentifierInterceptor.cpp
     lib/metricsSingleton.cpp
     lib/noDataCache.cpp
     lib/noDataCacheOptions.cpp
@@ -134,13 +136,15 @@ target_include_directories(libuEarthscopeDataselectAmbassador
                            PUBLIC  $<INSTALL_INTERFACE:>
                           )
 target_link_libraries(libuEarthscopeDataselectAmbassador
-                      PUBLIC spdlog::spdlog_header_only
+                      PUBLIC gRPC::grpc++
+                             spdlog::spdlog_header_only
                       PRIVATE Boost::headers
                               Boost::program_options
                               Boost::url
-                              Threads::Threads
+                              CURL::libcurl
+                              gRPC::grpc
                               mseed::mseed
-                              CURL::libcurl)
+                              Threads::Threads)
 target_sources(libuEarthscopeDataselectAmbassador
                PUBLIC FILE_SET
                       HEADERS
