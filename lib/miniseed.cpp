@@ -1,11 +1,49 @@
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdint>
+#include <exception>
 #include <stdexcept>
+#include <string>
 #include <vector>
 #include <libmseed.h>
 #include "uEarthscopeDataselectAmbassador/miniseed.hpp"
 
 using namespace UEarthscopeDataselectAmbassador::MiniSEED;
+
+namespace
+{
+
+Packet fromMiniSEEDRecord(const MS3Record &miniSEEDRecord)
+{
+    Packet packet;
+    packet.startTime = std::chrono::nanoseconds {miniSEEDRecord.starttime};
+    packet.samplingRate = miniSEEDRecord.samprate;
+    packet.nSamples = static_cast<int> (miniSEEDRecord.samplecnt);
+    if (miniSEEDRecord.sampletype == 'i')
+    {
+        packet.dataType = Packet::DataType::Int32;
+    }
+    else if (miniSEEDRecord.sampletype == 'f')
+    {
+        packet.dataType = Packet::DataType::Float32;
+    }
+    else if (miniSEEDRecord.sampletype == 'd')
+    {
+        packet.dataType = Packet::DataType::Float64;
+    }
+    else if (miniSEEDRecord.sampletype == 't')
+    {
+        packet.dataType = Packet::DataType::Text;
+    }
+    else
+    {
+        throw std::runtime_error("Unhandled packet type "
+                               + std::to_string(miniSEEDRecord.sampletype));
+    }
+}
+
+}
 
 std::vector<Packet> 
 UEarthscopeDataselectAmbassador::MiniSEED::extract(
@@ -55,27 +93,43 @@ UEarthscopeDataselectAmbassador::MiniSEED::extract(
                               &miniSEEDRecord, parseFlags, verbose);
         if (parseValue == 0)
         {
-            // Is the selection we're looking for
+            // Is the selection we're looking for?
             if (ms3_matchselect(selections,
                                 miniSEEDRecord->sid,
                                 miniSEEDRecord->starttime,
                                 msr3_endtime(miniSEEDRecord),
                                 miniSEEDRecord->pubversion, nullptr))
             {
-               if (msr3_unpack_data(miniSEEDRecord, verbose) !=
-                                    miniSEEDRecord->samplecnt)
-               {
-                  if (miniSEEDRecord != nullptr)
-                  {
-                      msr3_free(&miniSEEDRecord);
-                      miniSEEDRecord = nullptr;
-                  }
-                  ms3_freeselections(selections);
-                  selections = nullptr;
-                  throw std::runtime_error("Failed to unpack data in packet");
-               }
+                // Unpack it
+                if (msr3_unpack_data(miniSEEDRecord, verbose) !=
+                                     miniSEEDRecord->samplecnt)
+                {
+                    if (miniSEEDRecord != nullptr)
+                    {
+                        msr3_free(&miniSEEDRecord);
+                        miniSEEDRecord = nullptr;
+                    }
+                    ms3_freeselections(selections);
+                    selections = nullptr;
+                    throw std::runtime_error("Failed to unpack data in packet");
+                }
+                try
+                {
+                    packets.push_back(::fromMiniSEEDRecord(*miniSEEDRecord));
+                }
+                catch (const std::exception &e)
+                {
+                    if (miniSEEDRecord != nullptr)
+                    {
+                        msr3_free(&miniSEEDRecord);
+                        miniSEEDRecord = nullptr;
+                    }
+                    ms3_freeselections(selections);
+                    selections = nullptr;
+                    throw;
+                }
             }
-            // Hit or miss move forwarwd
+            // Hit or miss move forward
             offset = offset + miniSEEDRecord->reclen;
         }
         else if (parseValue > 0)
@@ -99,5 +153,11 @@ UEarthscopeDataselectAmbassador::MiniSEED::extract(
             throw std::runtime_error("miniSEED error unpacking data");
         }
     }
+    std::sort(packets.begin(), packets.end(),
+              [](const auto &lhs, const auto &rhs)
+              {
+                  return lhs.startTime <= rhs.startTime;
+              });
+    return packets;
 }
 

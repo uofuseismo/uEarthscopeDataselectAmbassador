@@ -22,8 +22,8 @@ struct Packet
     {
         Text,
         Int32,
-        Float,
-        Double
+        Float32,
+        Float64
     };
     std::vector<unsigned char> data;
     std::chrono::nanoseconds startTime{0};

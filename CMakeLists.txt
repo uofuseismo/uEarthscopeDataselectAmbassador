@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(uEarthscopeDataselectAmbassador VERSION 0.1.4 LANGUAGES CXX)
+project(uEarthscopeDataselectAmbassador VERSION 0.1.5 LANGUAGES CXX)
 enable_testing()
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
@@ -120,11 +120,21 @@ set(LIBRARY_SRC
     lib/rateLimiter.cpp
     lib/request.cpp
     lib/version.cpp)
+set(PROTO_SRC
+    uEarthscopeDataselectAmbassadorAPI/v1/data_type.proto
+    uEarthscopeDataselectAmbassadorAPI/v1/get_streams_request.proto
+    uEarthscopeDataselectAmbassadorAPI/v1/get_streams_response.proto
+    uEarthscopeDataselectAmbassadorAPI/v1/packet.proto
+    uEarthscopeDataselectAmbassadorAPI/v1/service.proto
+    uEarthscopeDataselectAmbassadorAPI/v1/stream.proto
+    uEarthscopeDataselectAmbassadorAPI/v1/stream_identifier.proto
+    uEarthscopeDataselectAmbassadorAPI/v1/stream_request.proto)
+
 
 if (${BUILD_SHARED_LIBS})
-   add_library(libuEarthscopeDataselectAmbassador SHARED ${LIBRARY_SRC})
+   add_library(libuEarthscopeDataselectAmbassador SHARED ${LIBRARY_SRC} ${PROTO_SRC})
 else()
-   add_library(libuEarthscopeDataselectAmbassador STATIC ${LIBRARY_SRC})
+   add_library(libuEarthscopeDataselectAmbassador STATIC ${LIBRARY_SRC} ${PROTO_SRC})
 endif()
 add_library(uEarthscopeDataselectAmbassador::libuEarthscopeDataselectAmbassador ALIAS libuEarthscopeDataselectAmbassador)
 set_target_properties(libuEarthscopeDataselectAmbassador PROPERTIES
@@ -135,7 +145,8 @@ set_target_properties(libuEarthscopeDataselectAmbassador PROPERTIES
 target_include_directories(libuEarthscopeDataselectAmbassador
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/lib>
-                           PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+                           #PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+                           PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
                            PUBLIC  $<INSTALL_INTERFACE:>
                           )
 target_link_libraries(libuEarthscopeDataselectAmbassador
@@ -146,6 +157,7 @@ target_link_libraries(libuEarthscopeDataselectAmbassador
                               Boost::url
                               CURL::libcurl
                               gRPC::grpc
+                              protobuf::libprotobuf
                               mseed::mseed
                               Threads::Threads)
 target_sources(libuEarthscopeDataselectAmbassador
@@ -159,6 +171,22 @@ target_sources(libuEarthscopeDataselectAmbassador
                          ${WILL_BE_DELETED_HEADER_FILES}
                          ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}/version.hpp
                )
+protobuf_generate(TARGET libuEarthscopeDataselectAmbassador
+                  LANGUAGE cpp
+                  OUT_VAR PROTO_GENERATED_CXX_FILES
+                 )
+protobuf_generate(TARGET libuEarthscopeDataselectAmbassador
+                  LANGUAGE grpc
+                  PLUGIN "protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
+                  PLUGIN_OPTIONS generate_mock_code=true
+                  GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
+                  OUT_VAR PROTO_GENERATED_FILES
+                 )
+set_source_files_properties(${PROTO_GENERATED_FILES} ${PROTO_GENERATED_CXX_FILES}
+   PROPERTIES
+      SKIP_LINTING ON
+)
+
 
 add_executable(uEarthscopeDataselectHTTPAmbassador
                src/httpServer/main.cpp)
@@ -259,10 +287,24 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
                               PRIVATE ${CMAKE_SOURCE_DIR}/include
                                       ${CMAKE_SOURCE_DIR}/src
                                       ${CMAKE_SOURCE_DIR}/lib
+                                      ${CMAKE_CURRENT_BINARY_DIR}
                                       ${CMAKE_CURRENT_BINARY_DIR}/include)
    target_link_libraries(unitTests
                          PRIVATE uEarthscopeDataselectAmbassador::libuEarthscopeDataselectAmbassador
                                  Catch2::Catch2WithMain)
+   add_test(NAME unitTests
+            COMMAND $<TARGET_FILE:unitTests>)
+   #protobuf_generate(TARGET unitTests
+   #                  LANGUAGE cpp
+   #                  OUT_VAR PROTO_GENERATED_CXX_FILES
+   #                 )
+   #protobuf_generate(TARGET unitTests
+   #                  LANGUAGE grpc
+   #                  PLUGIN "protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
+   #                  PLUGIN_OPTIONS generate_mock_code=true
+   #                  GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
+   #                  OUT_VAR PROTO_GENERATED_FILES
+   #                 )
    catch_discover_tests(unitTests)
 endif()
 
